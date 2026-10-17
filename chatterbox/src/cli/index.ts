@@ -13,6 +13,19 @@ import { runCommand } from './commands/run.js';
 import { demoCommand } from './commands/demo.js';
 import { logger } from '../utils/logger.js';
 
+// Sanitize unhandled exceptions to prevent exposing raw stack traces or internal source code paths
+process.on('uncaughtException', (err: unknown) => {
+  const message = err instanceof Error ? err.message : String(err);
+  logger.error(message);
+  process.exit(1);
+});
+
+process.on('unhandledRejection', (reason: unknown) => {
+  const message = reason instanceof Error ? reason.message : String(reason);
+  logger.error(message);
+  process.exit(1);
+});
+
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
