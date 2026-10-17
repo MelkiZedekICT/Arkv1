@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { Box, useInput, useApp, useStdin } from 'ink';
 import { EventBus } from '../core/events/event-bus.js';
-import { DemoRunner } from '../core/simulation/demo-runner.js';
 import { useAgentFeedEvents } from './hooks/useAgentFeedEvents.js';
 import { useElapsedTimer } from './hooks/useElapsedTimer.js';
 import { TaskHeader } from './components/TaskHeader.js';
@@ -9,11 +8,23 @@ import { AgentFeed } from './components/AgentFeed.js';
 import { TaskGraph } from './components/TaskGraph.js';
 import { ApprovalPrompt } from './components/ApprovalPrompt.js';
 import { ArtifactViewer } from './components/ArtifactViewer.js';
+import { PlanProposedView } from './components/PlanProposedView.js';
 import { StatusBar } from './components/StatusBar.js';
+
+export interface AppController {
+  stop: () => void;
+  pause?: () => void;
+  resume?: () => void;
+  approve?: () => void;
+  reject?: () => void;
+  approvePlan?: () => void;
+  rejectPlan?: () => void;
+  requestRevision?: (feedback: string) => void;
+}
 
 export interface AppProps {
   eventBus: EventBus;
-  runner: DemoRunner;
+  runner: AppController;
   onExit?: () => void;
 }
 
@@ -23,49 +34,77 @@ export const App: React.FC<AppProps> = ({ eventBus, runner, onExit }) => {
   const state = useAgentFeedEvents(eventBus);
   const [isViewingArtifact, setIsViewingArtifact] = useState(false);
 
-  const isRunning = state.taskStatus === 'running' || state.taskStatus === 'planning';
+  const isRunning = state.taskStatus === 'running' || state.taskStatus === 'planning' || state.taskStatus === 'awaiting_approval';
   const elapsedTime = useElapsedTimer(isRunning, state.isPaused || state.isCompleted);
 
   useInput(
     (input, key) => {
-    const char = input.toLowerCase();
+      const char = input.toLowerCase();
 
-    // Quit safely
-    if (char === 'q' || (key.ctrl && char === 'c')) {
-      runner.stop();
-      if (onExit) onExit();
-      exit();
-      return;
-    }
-
-    // Toggle artifact viewer
-    if (char === 'v') {
-      setIsViewingArtifact((prev) => !prev);
-      return;
-    }
-
-    // Pause / Resume
-    if (char === 'p') {
-      runner.pause();
-      return;
-    }
-    if (char === 's') {
-      runner.resume();
-      return;
-    }
-
-    // Approval actions
-    if (state.pendingApproval) {
-      if (char === 'a') {
-        runner.approve();
+      // Quit safely
+      if (char === 'q' || (key.ctrl && char === 'c')) {
+        runner.stop();
+        if (onExit) onExit();
+        exit();
         return;
       }
-      if (char === 'r') {
-        runner.reject();
+
+      // Toggle artifact viewer
+      if (char === 'v') {
+        setIsViewingArtifact((prev) => !prev);
         return;
       }
-    }
-  }, { isActive: Boolean(isRawModeSupported && process.stdin.isTTY) });
+
+      // Pause / Resume
+      if (char === 'p' && runner.pause) {
+        runner.pause();
+        return;
+      }
+      if (char === 's' && runner.resume) {
+        runner.resume();
+        return;
+      }
+
+      // Plan Review actions
+      if (state.proposedPlan && state.planDecision === 'awaiting_decision') {
+        if (char === 'a') {
+          if (runner.approvePlan) {
+            runner.approvePlan();
+          } else if (runner.approve) {
+            runner.approve();
+          }
+          return;
+        }
+        if (char === 'r') {
+          if (runner.rejectPlan) {
+            runner.rejectPlan();
+          } else if (runner.reject) {
+            runner.reject();
+          }
+          return;
+        }
+        if (char === 'e' && runner.requestRevision) {
+          runner.requestRevision('Please revise task breakdown, clarify acceptance criteria, and refine dependencies.');
+          return;
+        }
+      }
+
+      // Generic action approval (e.g. from demo runner)
+      if (state.pendingApproval) {
+        if (char === 'a' && runner.approve) {
+          runner.approve();
+          return;
+        }
+        if (char === 'r' && runner.reject) {
+          runner.reject();
+          return;
+        }
+      }
+    },
+    { isActive: Boolean(isRawModeSupported && process.stdin.isTTY) }
+  );
+
+  const isAwaitingPlanDecision = Boolean(state.proposedPlan && state.planDecision === 'awaiting_decision');
 
   return (
     <Box flexDirection="column" paddingX={1} paddingY={0}>
@@ -77,7 +116,9 @@ export const App: React.FC<AppProps> = ({ eventBus, runner, onExit }) => {
         eventCount={state.eventCount}
       />
 
-      {isViewingArtifact ? (
+      {isAwaitingPlanDecision && state.proposedPlan ? (
+        <PlanProposedView plan={state.proposedPlan} />
+      ) : isViewingArtifact ? (
         <ArtifactViewer
           artifact={state.latestArtifact}
           onClose={() => setIsViewingArtifact(false)}
@@ -99,6 +140,7 @@ export const App: React.FC<AppProps> = ({ eventBus, runner, onExit }) => {
         hasArtifact={Boolean(state.latestArtifact)}
         isViewingArtifact={isViewingArtifact}
         awaitingApproval={Boolean(state.pendingApproval)}
+        awaitingPlanDecision={isAwaitingPlanDecision}
       />
     </Box>
   );

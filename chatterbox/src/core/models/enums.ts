@@ -4,6 +4,7 @@ export const TaskStatusSchema = z.enum([
   'draft',
   'planning',
   'awaiting_approval',
+  'ready',
   'running',
   'paused',
   'blocked',

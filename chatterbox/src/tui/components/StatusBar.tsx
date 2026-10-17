@@ -7,6 +7,7 @@ export interface StatusBarProps {
   hasArtifact: boolean;
   isViewingArtifact: boolean;
   awaitingApproval: boolean;
+  awaitingPlanDecision?: boolean;
 }
 
 export const StatusBar: React.FC<StatusBarProps> = ({
@@ -15,6 +16,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   hasArtifact,
   isViewingArtifact,
   awaitingApproval,
+  awaitingPlanDecision,
 }) => {
   return (
     <Box
@@ -25,7 +27,23 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     >
       <Box flexDirection="row" justifyContent="space-between">
         <Box flexDirection="row">
-          {awaitingApproval && (
+          {awaitingPlanDecision && (
+            <>
+              <Text color="yellowBright" bold>
+                [A]{' '}
+              </Text>
+              <Text>Approve Plan  </Text>
+              <Text color="redBright" bold>
+                [R]{' '}
+              </Text>
+              <Text>Reject Plan  </Text>
+              <Text color="cyanBright" bold>
+                [E]{' '}
+              </Text>
+              <Text>Revise  </Text>
+            </>
+          )}
+          {awaitingApproval && !awaitingPlanDecision && (
             <>
               <Text color="greenBright" bold>
                 [A]{' '}

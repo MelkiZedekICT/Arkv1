@@ -4,3 +4,4 @@ export * from './agent.repository.js';
 export * from './message.repository.js';
 export * from './artifact.repository.js';
 export * from './approval.repository.js';
+export * from './usage.repository.js';

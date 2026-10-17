@@ -2,7 +2,20 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
 import { join } from 'path';
 import { Config, ConfigSchema } from './schema.js';
 
+// Safely load local .env if available, without crashing if missing
+if (typeof process.loadEnvFile === 'function') {
+  try {
+    process.loadEnvFile();
+  } catch {
+    // .env is optional
+  }
+}
+
 let cachedConfig: Config | null = null;
+
+export function clearConfigCache(): void {
+  cachedConfig = null;
+}
 
 export function resolveStorageDir(cwd = process.cwd()): string {
   const chatterboxDir = join(cwd, '.chatterbox');

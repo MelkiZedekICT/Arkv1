@@ -1,3 +1,5 @@
+import { redactSensitiveText } from './security.js';
+
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
 class Logger {
@@ -9,27 +11,29 @@ class Logger {
 
   debug(message: string, ...args: unknown[]): void {
     if (this.isVerbose) {
-      console.log(`[DEBUG] ${message}`, ...args);
+      console.log(`[DEBUG] ${redactSensitiveText(message)}`, ...args);
     }
   }
 
   info(message: string, ...args: unknown[]): void {
-    console.log(message, ...args);
+    console.log(redactSensitiveText(message), ...args);
   }
 
   warn(message: string, ...args: unknown[]): void {
-    console.warn(`[WARN] ${message}`, ...args);
+    console.warn(`[WARN] ${redactSensitiveText(message)}`, ...args);
   }
 
   error(message: string, error?: unknown): void {
+    const cleanMessage = redactSensitiveText(message);
     if (this.isVerbose && error instanceof Error && error.stack) {
-      console.error(`[ERROR] ${message}\n${error.stack}`);
+      console.error(`[ERROR] ${cleanMessage}\n${redactSensitiveText(error.stack)}`);
     } else if (error instanceof Error) {
-      console.error(`[ERROR] ${message}: ${error.message}`);
+      console.error(`[ERROR] ${cleanMessage}: ${redactSensitiveText(error.message)}`);
     } else {
-      console.error(`[ERROR] ${message}`);
+      console.error(`[ERROR] ${cleanMessage}`);
     }
   }
 }
 
 export const logger = new Logger();
+

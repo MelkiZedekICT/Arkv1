@@ -11,6 +11,10 @@ export interface TaskHeaderProps {
 
 function getStatusColor(status: string): string {
   switch (status.toLowerCase()) {
+    case 'ready':
+      return 'greenBright';
+    case 'awaiting_approval':
+      return 'yellowBright';
     case 'running':
       return 'cyan';
     case 'paused':

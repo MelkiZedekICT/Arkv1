@@ -11,6 +11,7 @@ import { taskViewCommand } from './commands/task-view.js';
 import { eventsCommand } from './commands/events.js';
 import { runCommand } from './commands/run.js';
 import { demoCommand } from './commands/demo.js';
+import { configCommand } from './commands/config.js';
 import { logger } from '../utils/logger.js';
 
 // Sanitize unhandled exceptions to prevent exposing raw stack traces or internal source code paths
@@ -59,5 +60,7 @@ program.addCommand(taskViewCommand);
 program.addCommand(eventsCommand);
 program.addCommand(runCommand);
 program.addCommand(demoCommand);
+program.addCommand(configCommand);
 
 program.parse(process.argv);
+

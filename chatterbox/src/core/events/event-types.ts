@@ -4,9 +4,14 @@ import { ActorTypeSchema } from '../models/enums.js';
 export const AgentFeedEventTypeSchema = z.enum([
   'task_created',
   'task_updated',
+  'planner_started',
+  'planner_message',
+  'planner_response_received',
   'plan_proposed',
+  'plan_validation_failed',
   'plan_approved',
   'plan_rejected',
+  'plan_revision_requested',
   'node_created',
   'node_started',
   'node_completed',
@@ -45,11 +50,47 @@ export const TaskUpdatedPayloadSchema = z.object({
 });
 export type TaskUpdatedPayload = z.infer<typeof TaskUpdatedPayloadSchema>;
 
+export const PlannerStartedPayloadSchema = z.object({
+  model: z.string().optional(),
+  provider: z.string().optional(),
+  promptTokens: z.number().optional(),
+});
+export type PlannerStartedPayload = z.infer<typeof PlannerStartedPayloadSchema>;
+
+export const PlannerMessagePayloadSchema = z.object({
+  content: z.string(),
+  phase: z.enum(['understanding', 'designing', 'validating', 'repairing']).optional(),
+});
+export type PlannerMessagePayload = z.infer<typeof PlannerMessagePayloadSchema>;
+
+export const PlannerResponseReceivedPayloadSchema = z.object({
+  rawResponseLength: z.number().optional(),
+  latencyMs: z.number().optional(),
+  usage: z
+    .object({
+      inputTokens: z.number(),
+      outputTokens: z.number(),
+      estimatedCostUsd: z.number().optional(),
+    })
+    .optional(),
+});
+export type PlannerResponseReceivedPayload = z.infer<typeof PlannerResponseReceivedPayloadSchema>;
+
 export const PlanProposedPayloadSchema = z.object({
-  nodes: z.array(z.record(z.string(), z.unknown())),
+  title: z.string().optional(),
   summary: z.string().optional(),
+  assumptions: z.array(z.string()).optional(),
+  risks: z.array(z.string()).optional(),
+  nodes: z.array(z.record(z.string(), z.unknown())),
 });
 export type PlanProposedPayload = z.infer<typeof PlanProposedPayloadSchema>;
+
+export const PlanValidationFailedPayloadSchema = z.object({
+  errors: z.array(z.string()),
+  attempt: z.number(),
+  maxAttempts: z.number(),
+});
+export type PlanValidationFailedPayload = z.infer<typeof PlanValidationFailedPayloadSchema>;
 
 export const PlanApprovedPayloadSchema = z.object({
   approvedBy: z.string(),
@@ -62,6 +103,12 @@ export const PlanRejectedPayloadSchema = z.object({
   reason: z.string(),
 });
 export type PlanRejectedPayload = z.infer<typeof PlanRejectedPayloadSchema>;
+
+export const PlanRevisionRequestedPayloadSchema = z.object({
+  requestedBy: z.string(),
+  feedback: z.string(),
+});
+export type PlanRevisionRequestedPayload = z.infer<typeof PlanRevisionRequestedPayloadSchema>;
 
 export const NodeCreatedPayloadSchema = z.object({
   nodeId: z.string(),
