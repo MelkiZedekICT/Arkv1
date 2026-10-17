@@ -10,6 +10,7 @@ import { tasksCommand } from './commands/tasks.js';
 import { taskViewCommand } from './commands/task-view.js';
 import { eventsCommand } from './commands/events.js';
 import { runCommand } from './commands/run.js';
+import { demoCommand } from './commands/demo.js';
 import { logger } from '../utils/logger.js';
 
 const __filename = fileURLToPath(import.meta.url);
@@ -44,5 +45,6 @@ program.addCommand(tasksCommand);
 program.addCommand(taskViewCommand);
 program.addCommand(eventsCommand);
 program.addCommand(runCommand);
+program.addCommand(demoCommand);
 
 program.parse(process.argv);
