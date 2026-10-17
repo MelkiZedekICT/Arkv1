@@ -1,43 +1,52 @@
 import { Command } from 'commander';
-import { mkdirSync, writeFileSync, existsSync } from 'fs';
+import { mkdirSync, existsSync } from 'fs';
 import { join } from 'path';
+import { resolveStorageDir, saveConfig } from '../../core/config/config.js';
+import { getDatabase } from '../../core/storage/database.js';
+import { AgentRepository } from '../../core/storage/repositories/agent.repository.js';
 import { logger } from '../../utils/logger.js';
 
 export const initCommand = new Command('init')
-  .description('Initialize Chatterbox in the current directory')
-  .action(() => {
-    // Chatterbox stores local configuration, database, and event logs in .chatterbox
-    const chatterboxDir = join(process.cwd(), '.chatterbox');
+  .description('Initialize Chatterbox/AgentFeed in the current directory')
+  .action(async () => {
+    try {
+      const storageDir = resolveStorageDir();
 
-    if (!existsSync(chatterboxDir)) {
-      mkdirSync(chatterboxDir, { recursive: true });
-      logger.info(`Created directory: ${chatterboxDir}`);
-    } else {
-      logger.info(`Directory already exists: ${chatterboxDir}`);
-    }
+      if (!existsSync(storageDir)) {
+        mkdirSync(storageDir, { recursive: true });
+        logger.info(`Created storage directory: ${storageDir}`);
+      } else {
+        logger.info(`Storage directory ready: ${storageDir}`);
+      }
 
-    const configPath = join(chatterboxDir, 'config.json');
-    if (!existsSync(configPath)) {
-      const defaultConfig = {
+      // 1. Create or load config
+      saveConfig({
         modelProvider: 'openai',
         apiKey: '',
-      };
-      writeFileSync(configPath, JSON.stringify(defaultConfig, null, 2));
-      logger.info(`Created default config: ${configPath}`);
-    } else {
-      logger.info(`Config already exists: ${configPath}`);
-    }
+        model: 'gpt-4o',
+      });
+      logger.info(`Configuration initialized: ${join(storageDir, 'config.json')}`);
 
-    // Local SQLite database
-    const dbPath = join(chatterboxDir, 'local.db');
-    if (!existsSync(dbPath)) {
-      writeFileSync(dbPath, '');
-      logger.info(`Created local SQLite database file: ${dbPath}`);
-    } else {
-      logger.info(`Local SQLite database already exists: ${dbPath}`);
-    }
+      // 2. Initialize SQLite Database & Schema
+      const dbPath = join(storageDir, 'local.db');
+      const db = getDatabase(dbPath);
+      logger.info(`SQLite database initialized: ${dbPath}`);
 
-    logger.info('\nInitialization complete.');
-    logger.info('Please set your model provider and API key in the config file:');
-    logger.info(configPath);
+      // 3. Seed Default Specialist Agents
+      const agentRepo = new AgentRepository(db);
+      const agents = await agentRepo.seedDefaultAgents();
+      logger.info(`Seeded ${agents.length} default agents:`);
+      for (const a of agents) {
+        logger.info(`  - ${a.name} (${a.role}): ${a.description}`);
+      }
+
+      logger.info('\nInitialization complete.');
+      logger.info('To get started:');
+      logger.info('  1. Set your API key in: ' + join(storageDir, 'config.json'));
+      logger.info('  2. Create a task: agentfeed task:create "Your goal here"');
+      logger.info('  3. View tasks:    agentfeed tasks\n');
+    } catch (err) {
+      logger.error('Initialization failed', err);
+      process.exitCode = 1;
+    }
   });

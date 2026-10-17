@@ -1,43 +1,87 @@
-import { describe, it, expect, vi } from 'vitest';
-import { TaskService } from '../../src/core/task/task.service.js';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
+import { mkdtempSync, rmSync, existsSync } from 'fs';
+import { tmpdir } from 'os';
+import { join } from 'path';
+import { createDatabaseConnection, AppDatabase } from '../../src/core/storage/database.js';
+import { TaskRepository } from '../../src/core/storage/repositories/task.repository.js';
+import { EventStore } from '../../src/core/events/event-store.js';
 import { EventBus } from '../../src/core/events/event-bus.js';
-import * as dbModule from '../../src/core/storage/database.js';
+import { TaskService } from '../../src/core/task/task.service.js';
 
-// Mock the DB and dependencies
-vi.mock('../../src/core/storage/database.js', () => {
-  const mockInsert = vi.fn().mockReturnValue({
-    values: vi.fn().mockResolvedValue(true)
+describe('TaskService Integration', () => {
+  let tempDir: string;
+  let db: AppDatabase;
+  let taskRepo: TaskRepository;
+  let eventStore: EventStore;
+  let eventBus: EventBus;
+  let taskService: TaskService;
+
+  beforeEach(() => {
+    tempDir = mkdtempSync(join(tmpdir(), 'chatterbox-test-task-'));
+    db = createDatabaseConnection(':memory:');
+    taskRepo = new TaskRepository(db);
+    eventStore = new EventStore(tempDir);
+    eventBus = new EventBus(eventStore);
+    taskService = new TaskService(taskRepo, eventBus);
   });
-  const mockDb = {
-    insert: mockInsert
-  };
-  return {
-    getDatabase: vi.fn(() => mockDb)
-  };
-});
 
-describe('TaskService', () => {
-  it('should create a task, persist to DB and emit event', async () => {
-    const mockEmit = vi.fn();
-    const mockEventBus = {
-      emit: mockEmit
-    } as unknown as EventBus;
+  afterEach(() => {
+    if (existsSync(tempDir)) {
+      rmSync(tempDir, { recursive: true, force: true });
+    }
+  });
 
-    const service = new TaskService(mockEventBus, ':memory:');
+  it('creates task in SQLite, writes task_created event to JSONL, and emits on bus', async () => {
+    const subscriber = vi.fn();
+    eventBus.subscribe('task_created', subscriber);
 
-    const taskId = await service.createTask('Test task creation');
-    
-    expect(taskId).toBeDefined();
-    expect(taskId).toContain('task_');
+    const goal = 'Create competitive brief on security startups';
+    const task = await taskService.createTask({
+      goal,
+      title: 'Security Startups Brief',
+      visibility: 'private',
+    });
 
-    // Ensure getDatabase was called
-    expect(dbModule.getDatabase).toHaveBeenCalledWith(':memory:');
+    // 1. Verify returned task
+    expect(task.id).toMatch(/^task_/);
+    expect(task.title).toBe('Security Startups Brief');
+    expect(task.goal).toBe(goal);
+    expect(task.status).toBe('draft');
 
-    // Ensure event bus emit was called
-    expect(mockEmit).toHaveBeenCalled();
-    const emittedEvent = mockEmit.mock.calls[0][0];
-    expect(emittedEvent.type).toBe('task_created');
-    expect(emittedEvent.taskId).toBe(taskId);
-    expect(emittedEvent.payload.goal).toBe('Test task creation');
+    // 2. Verify persisted in SQLite
+    const persisted = await taskRepo.getById(task.id);
+    expect(persisted).not.toBeNull();
+    expect(persisted?.goal).toBe(goal);
+
+    // 3. Verify event emitted on bus
+    expect(subscriber).toHaveBeenCalledTimes(1);
+    const emitted = subscriber.mock.calls[0][0];
+    expect(emitted.type).toBe('task_created');
+    expect(emitted.taskId).toBe(task.id);
+    expect(emitted.payload.goal).toBe(goal);
+
+    // 4. Verify persisted to per-task JSONL file
+    const events = await eventStore.getEvents(task.id);
+    expect(events).toHaveLength(1);
+    expect(events[0].eventId).toBe(emitted.eventId);
+    expect(events[0].type).toBe('task_created');
+  });
+
+  it('rejects empty task goal with an informative error', async () => {
+    await expect(taskService.createTask('')).rejects.toThrow(/Task goal cannot be empty/);
+    await expect(taskService.createTask({ goal: '   ' })).rejects.toThrow(
+      /Task goal cannot be empty/
+    );
+  });
+
+  it('lists tasks newest first', async () => {
+    await taskService.createTask({ goal: 'Goal 1', title: 'Task 1' });
+    await taskService.createTask({ goal: 'Goal 2', title: 'Task 2' });
+
+    const list = await taskService.listTasks();
+    expect(list).toHaveLength(2);
+    // Newest first
+    expect(list[0].title).toBe('Task 2');
+    expect(list[1].title).toBe('Task 1');
   });
 });

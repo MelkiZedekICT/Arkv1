@@ -1,31 +1,101 @@
 import { EventEmitter } from 'events';
-import { ChatterboxEvent } from './event-types.js';
+import { AgentFeedEvent, AgentFeedEventSchema, AgentFeedEventType } from './event-types.js';
 import { EventStore } from './event-store.js';
 
-type EventHandler = (event: ChatterboxEvent) => void;
+export type EventHandler<T extends AgentFeedEvent = AgentFeedEvent> = (
+  event: T
+) => void | Promise<void>;
 
 export class EventBus {
   private emitter = new EventEmitter();
-  private store: EventStore;
+  private processedEventIds = new Set<string>();
 
-  constructor(store: EventStore) {
-    this.store = store;
+  constructor(private store: EventStore) {
+    this.emitter.setMaxListeners(100);
   }
 
-  emit(event: ChatterboxEvent): void {
-    // Persist event to JSONL
-    this.store.append(event);
-    
-    // Broadcast event in-process
-    this.emitter.emit(event.type, event);
-    this.emitter.emit('*', event); // Wildcard for logging/debugging
+  async publish<TPayload = Record<string, unknown>>(
+    event: AgentFeedEvent<TPayload>
+  ): Promise<AgentFeedEvent<TPayload>> {
+    // 1. Validate event schema
+    const validated = AgentFeedEventSchema.parse(event) as AgentFeedEvent<TPayload>;
+
+    // 2. Prevent duplicate event IDs
+    if (this.processedEventIds.has(validated.eventId)) {
+      throw new Error(`Duplicate event ID rejected: "${validated.eventId}"`);
+    }
+    this.processedEventIds.add(validated.eventId);
+
+    // 3. Persist to per-task JSONL store
+    await this.store.appendEvent(validated as AgentFeedEvent);
+
+    // 4. Emit to typed subscribers safely
+    this.dispatchSafe(validated.type, validated);
+    this.dispatchSafe('*', validated);
+
+    return validated;
   }
 
-  on(eventType: ChatterboxEvent['type'] | '*', handler: EventHandler): void {
-    this.emitter.on(eventType, handler);
+  // Alias for backward compatibility
+  emit<TPayload = Record<string, unknown>>(event: AgentFeedEvent<TPayload>): void {
+    void this.publish(event);
   }
 
-  off(eventType: ChatterboxEvent['type'] | '*', handler: EventHandler): void {
-    this.emitter.off(eventType, handler);
+  subscribe<T extends AgentFeedEvent = AgentFeedEvent>(
+    eventType: AgentFeedEventType | '*',
+    handler: EventHandler<T>
+  ): () => void {
+    const wrapped = async (event: unknown) => {
+      try {
+        await handler(event as T);
+      } catch (err) {
+        console.error(`[EventBus] Unhandled error in listener for "${eventType}":`, err);
+      }
+    };
+
+    this.emitter.on(eventType, wrapped);
+
+    // Return unbind function
+    return () => {
+      this.emitter.off(eventType, wrapped);
+    };
+  }
+
+  unsubscribe<T extends AgentFeedEvent = AgentFeedEvent>(
+    eventType: AgentFeedEventType | '*',
+    handler: EventHandler<T>
+  ): void {
+    this.emitter.off(eventType, handler as (...args: unknown[]) => void);
+  }
+
+  // Aliases for standard EventEmitter API
+  on<T extends AgentFeedEvent = AgentFeedEvent>(
+    eventType: AgentFeedEventType | '*',
+    handler: EventHandler<T>
+  ): () => void {
+    return this.subscribe(eventType, handler);
+  }
+
+  off<T extends AgentFeedEvent = AgentFeedEvent>(
+    eventType: AgentFeedEventType | '*',
+    handler: EventHandler<T>
+  ): void {
+    this.unsubscribe(eventType, handler);
+  }
+
+  private dispatchSafe(eventType: string, event: unknown): void {
+    const listeners = this.emitter.listeners(eventType);
+    for (const listener of listeners) {
+      try {
+        const result: unknown = listener(event);
+        if (result instanceof Promise) {
+          result.catch((err: unknown) => {
+            console.error(`[EventBus] Async listener error for "${eventType}":`, err);
+          });
+        }
+      } catch (err) {
+        console.error(`[EventBus] Sync listener error for "${eventType}":`, err);
+      }
+    }
   }
 }

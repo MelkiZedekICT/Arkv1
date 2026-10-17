@@ -1,40 +1,81 @@
+import { TaskRepository } from '../storage/repositories/task.repository.js';
 import { EventBus } from '../events/event-bus.js';
+import { Task, TaskSchema } from '../models/task.js';
 import { generateId } from '../../utils/ids.js';
 import { getTimestamp } from '../../utils/time.js';
-import { getDatabase } from '../storage/database.js';
-import { tasks } from '../storage/schema.js';
+
+export interface CreateTaskOptions {
+  goal: string;
+  title?: string;
+  createdBy?: string;
+  visibility?: 'private' | 'public';
+}
 
 export class TaskService {
   constructor(
-    private eventBus: EventBus,
-    private dbPath: string
+    private taskRepo: TaskRepository,
+    private eventBus: EventBus
   ) {}
 
-  async createTask(goal: string): Promise<string> {
+  async createTask(options: string | CreateTaskOptions): Promise<Task> {
+    const opts: CreateTaskOptions =
+      typeof options === 'string' ? { goal: options } : options;
+
+    if (!opts.goal || opts.goal.trim().length === 0) {
+      throw new Error('Task goal cannot be empty');
+    }
+
     const taskId = generateId('task');
     const timestamp = getTimestamp();
+    const title =
+      opts.title?.trim() ||
+      (opts.goal.length > 50 ? `${opts.goal.slice(0, 47)}...` : opts.goal);
+    const createdBy = opts.createdBy || 'user_local';
+    const visibility = opts.visibility || 'private';
 
-    // 1. Persist to DB
-    const db = getDatabase(this.dbPath);
-    await db.insert(tasks).values({
+    const task: Task = TaskSchema.parse({
       id: taskId,
-      goal,
-      status: 'pending',
+      title,
+      goal: opts.goal,
+      status: 'draft',
+      createdBy,
+      visibility,
       createdAt: timestamp,
       updatedAt: timestamp,
     });
 
-    // 2. Emit Event
-    this.eventBus.emit({
-      type: 'task_created',
-      eventId: generateId('evt'),
+    // 1. Persist to SQLite via TaskRepository
+    const createdTask = await this.taskRepo.create(task);
+
+    // 2. Publish task_created event through EventBus (validates, appends to JSONL, emits to listeners)
+    const correlationId = generateId('corr');
+    const eventId = generateId('evt');
+
+    await this.eventBus.publish({
+      eventId,
       taskId,
+      type: 'task_created',
       timestamp,
       actorType: 'user',
-      actorId: 'local_user',
-      payload: { goal },
+      actorId: createdBy,
+      correlationId,
+      payload: {
+        title: createdTask.title,
+        goal: createdTask.goal,
+        status: createdTask.status,
+        visibility: createdTask.visibility,
+        createdBy: createdTask.createdBy,
+      },
     });
 
-    return taskId;
+    return createdTask;
+  }
+
+  async getTask(id: string): Promise<Task | null> {
+    return this.taskRepo.getById(id);
+  }
+
+  async listTasks(limit = 20, offset = 0): Promise<Task[]> {
+    return this.taskRepo.list(limit, offset);
   }
 }
