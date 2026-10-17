@@ -18,15 +18,15 @@ let version = '1.0.0';
 try {
   const pkgInfo = JSON.parse(readFileSync(pkgPath, 'utf8'));
   version = pkgInfo.version;
-} catch (e) {
+} catch {
   // fallback if running from somewhere unexpected
 }
 
 const program = new Command();
 
 program
-  .name('agentfeed')
-  .description('Terminal-first multi-agent orchestration product')
+  .name('chatterbox')
+  .description('Chatterbox - Terminal-first multi-agent orchestration control room')
   .version(version);
 
 program.addCommand(initCommand);

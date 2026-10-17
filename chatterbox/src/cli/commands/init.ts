@@ -1,24 +1,22 @@
 import { Command } from 'commander';
 import { mkdirSync, writeFileSync, existsSync } from 'fs';
 import { join } from 'path';
-import { homedir } from 'os';
 import { logger } from '../../utils/logger.js';
 
 export const initCommand = new Command('init')
-  .description('Initialize AgentFeed in the current directory')
+  .description('Initialize Chatterbox in the current directory')
   .action(() => {
-    // For local-first apps, we often create a `.agentfeed` folder in the current project
-    // or in the home directory. Based on requirements, let's create it in the CWD.
-    const agentFeedDir = join(process.cwd(), '.agentfeed');
+    // Chatterbox stores local configuration, database, and event logs in .chatterbox
+    const chatterboxDir = join(process.cwd(), '.chatterbox');
 
-    if (!existsSync(agentFeedDir)) {
-      mkdirSync(agentFeedDir, { recursive: true });
-      logger.info(`Created directory: ${agentFeedDir}`);
+    if (!existsSync(chatterboxDir)) {
+      mkdirSync(chatterboxDir, { recursive: true });
+      logger.info(`Created directory: ${chatterboxDir}`);
     } else {
-      logger.info(`Directory already exists: ${agentFeedDir}`);
+      logger.info(`Directory already exists: ${chatterboxDir}`);
     }
 
-    const configPath = join(agentFeedDir, 'config.json');
+    const configPath = join(chatterboxDir, 'config.json');
     if (!existsSync(configPath)) {
       const defaultConfig = {
         modelProvider: 'openai',
@@ -30,9 +28,8 @@ export const initCommand = new Command('init')
       logger.info(`Config already exists: ${configPath}`);
     }
 
-    // SQLite DB will be created in Milestone 2.
-    // For now, we simulate the database creation by creating an empty file or just a log message.
-    const dbPath = join(agentFeedDir, 'local.db');
+    // Local SQLite database
+    const dbPath = join(chatterboxDir, 'local.db');
     if (!existsSync(dbPath)) {
       writeFileSync(dbPath, '');
       logger.info(`Created local SQLite database file: ${dbPath}`);

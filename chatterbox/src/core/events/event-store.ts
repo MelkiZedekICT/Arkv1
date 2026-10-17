@@ -1,6 +1,6 @@
 import { appendFileSync, mkdirSync } from 'fs';
 import { join, dirname } from 'path';
-import { AgentFeedEvent } from './event-types.js';
+import { ChatterboxEvent } from './event-types.js';
 
 export class EventStore {
   private logFilePath: string;
@@ -10,7 +10,7 @@ export class EventStore {
     mkdirSync(dirname(this.logFilePath), { recursive: true });
   }
 
-  append(event: AgentFeedEvent): void {
+  append(event: ChatterboxEvent): void {
     const line = JSON.stringify(event) + '\n';
     appendFileSync(this.logFilePath, line, 'utf-8');
   }

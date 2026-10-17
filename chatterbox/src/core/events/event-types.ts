@@ -25,7 +25,7 @@ export const AgentMessageEventSchema = BaseEventSchema.extend({
   payload: z.object({ content: z.string() }),
 });
 
-export const AgentFeedEventSchema = z.discriminatedUnion('type', [
+export const ChatterboxEventSchema = z.discriminatedUnion('type', [
   TaskCreatedEventSchema,
   PlanProposedEventSchema,
   AgentMessageEventSchema,
@@ -41,4 +41,8 @@ export const AgentFeedEventSchema = z.discriminatedUnion('type', [
   BaseEventSchema.extend({ type: z.literal('error_occurred'), payload: z.any() }),
 ]);
 
-export type AgentFeedEvent = z.infer<typeof AgentFeedEventSchema>;
+export type ChatterboxEvent = z.infer<typeof ChatterboxEventSchema>;
+
+// Backward compatibility alias
+export const AgentFeedEventSchema = ChatterboxEventSchema;
+export type AgentFeedEvent = ChatterboxEvent;

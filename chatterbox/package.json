@@ -1,10 +1,11 @@
 {
-  "name": "agentfeed",
+  "name": "chatterbox",
   "version": "1.0.0",
-  "description": "Terminal-first multi-agent orchestration product",
+  "description": "Terminal-first multi-agent orchestration control room",
   "main": "dist/cli/index.js",
   "type": "module",
   "bin": {
+    "chatterbox": "dist/cli/index.js",
     "agentfeed": "dist/cli/index.js"
   },
   "scripts": {

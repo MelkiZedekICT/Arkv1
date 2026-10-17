@@ -11,7 +11,7 @@ export const runCommand = new Command('run')
   .action(async (goal: string) => {
     logger.info(`Starting run command with goal: "${goal}"`);
 
-    const baseDir = join(process.cwd(), '.agentfeed');
+    const baseDir = join(process.cwd(), '.chatterbox');
     const dbPath = join(baseDir, 'local.db');
 
     const eventStore = new EventStore(baseDir);
@@ -27,8 +27,8 @@ export const runCommand = new Command('run')
     try {
       const taskId = await taskService.createTask(goal);
       logger.info(`\nSuccessfully created task: ${taskId}`);
-      logger.info('Check .agentfeed/events.jsonl to see the persisted event.');
-      logger.info('Check .agentfeed/local.db to see the persisted task.');
+      logger.info('Check .chatterbox/events.jsonl to see the persisted event.');
+      logger.info('Check .chatterbox/local.db to see the persisted task.');
     } catch (e) {
       logger.error('Failed to create task: ' + (e as Error).message);
     }
