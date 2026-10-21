@@ -1,12 +1,16 @@
 import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync, readFileSync, existsSync, mkdirSync, symlinkSync } from 'fs';
 import { tmpdir } from 'os';
-import { join } from 'path';
+import { join, resolve } from 'path';
 import { workspaceService, WorkspaceError } from '../../src/core/workspace/workspace.service.js';
 import { PathGuard, PathGuardError } from '../../src/core/workspace/path-guard.js';
 import { diffService } from '../../src/core/workspace/diff.service.js';
 import { commandRunner, CommandSecurityError } from '../../src/core/workspace/command-runner.js';
-import { gitService } from '../../src/core/workspace/git.service.js';
+import {
+  gitService,
+  safelyUnlinkJunctions,
+  assertIsChatterboxManagedWorktree,
+} from '../../src/core/workspace/git.service.js';
 import { DefaultToolRegistry } from '../../src/core/tools/tool-registry.js';
 import { createDefaultToolRegistry } from '../../src/core/tools/index.js';
 import { CreateFileTool } from '../../src/core/tools/workspace/create-file.tool.js';
@@ -444,7 +448,7 @@ describe('Milestone 9: Workspace Security, Real Coding Operations, & Worktree Is
   });
 
   // 16. Git worktree is created for Git repositories
-  it('16. creates task worktree for git repository workspaces', () => {
+  it('16. creates task worktree for git repository workspaces', async () => {
     const gitProbe = gitService.probeGit(process.cwd());
     if (!gitProbe.isGitRepo) {
       return;
@@ -454,9 +458,43 @@ describe('Milestone 9: Workspace Security, Real Coding Operations, & Worktree Is
     expect(wt.worktreePath).toBeDefined();
     expect(existsSync(wt.worktreePath)).toBe(true);
 
-    // Clean up worktree
-    gitService.removeTaskWorktree(process.cwd(), wt.worktreePath);
+    // 1. Verify worktree is created under approved Chatterbox worktree root
+    const approvedWorktreeRoot = resolve(process.cwd(), '.chatterbox', 'worktrees');
+    expect(resolve(wt.worktreePath).startsWith(approvedWorktreeRoot)).toBe(true);
+
+    // 2. Verify worktree is registered in git worktree list
+    const initialWorktrees = await gitService.listWorktrees(process.cwd());
+    const isRegistered = initialWorktrees.some(
+      (w) => resolve(w.path).toLowerCase() === resolve(wt.worktreePath).toLowerCase()
+    );
+    expect(isRegistered).toBe(true);
+
+    // 3. Verify original workspace remains intact
+    const originalPackageJson = resolve(process.cwd(), 'package.json');
+    expect(existsSync(originalPackageJson)).toBe(true);
+
+    // 4. Deterministically remove worktree and await cleanup
+    await gitService.removeTaskWorktree(process.cwd(), wt.worktreePath);
     expect(existsSync(wt.worktreePath)).toBe(false);
+
+    // 5. Verify worktree is removed from git worktree list
+    const remainingWorktrees = await gitService.listWorktrees(process.cwd());
+    const isStillListed = remainingWorktrees.some(
+      (w) => resolve(w.path).toLowerCase() === resolve(wt.worktreePath).toLowerCase()
+    );
+    expect(isStillListed).toBe(false);
+
+    // 6. Verify original workspace files still intact
+    expect(existsSync(originalPackageJson)).toBe(true);
+
+    // 7. Security guard assertions: refuses to remove workspace root or outside directories
+    await expect(
+      gitService.removeTaskWorktree(process.cwd(), process.cwd())
+    ).rejects.toThrow(/Refusing to remove workspace root/);
+
+    await expect(
+      gitService.removeTaskWorktree(process.cwd(), resolve(process.cwd(), 'src'))
+    ).rejects.toThrow(/outside Chatterbox-managed/);
   });
 
   // 17. Original workspace is not modified before approval
@@ -813,5 +851,41 @@ describe('Milestone 9: Workspace Security, Real Coding Operations, & Worktree Is
     expect(publishedEvents.length).toBeGreaterThan(0);
     const content = JSON.stringify(publishedEvents);
     expect(content).not.toContain(secretKey);
+  });
+
+  // 23. Windows junction safety during worktree cleanup
+  it('23. safely unlinks Windows junctions without deleting their target directory', async () => {
+    const parentDir = mkdtempSync(join(tmpdir(), 'junction-test-parent-'));
+    const externalTarget = mkdtempSync(join(tmpdir(), 'junction-test-target-'));
+    const dummyFile = join(externalTarget, 'important-data.txt');
+    writeFileSync(dummyFile, 'CRITICAL DATA DO NOT DELETE', 'utf-8');
+
+    const testWorktree = join(parentDir, 'worktree-with-junction');
+    mkdirSync(testWorktree, { recursive: true });
+    const junctionLink = join(testWorktree, 'linked-target');
+
+    try {
+      // Create junction or directory symlink
+      symlinkSync(externalTarget, junctionLink, 'junction');
+      expect(existsSync(junctionLink)).toBe(true);
+
+      // Execute safelyUnlinkJunctions
+      await safelyUnlinkJunctions(testWorktree);
+
+      // The junction link in the worktree should be removed
+      expect(existsSync(junctionLink)).toBe(false);
+
+      // The external target and its files MUST remain completely intact
+      expect(existsSync(externalTarget)).toBe(true);
+      expect(existsSync(dummyFile)).toBe(true);
+      expect(readFileSync(dummyFile, 'utf-8')).toBe('CRITICAL DATA DO NOT DELETE');
+    } finally {
+      if (existsSync(parentDir)) {
+        rmSync(parentDir, { recursive: true, force: true });
+      }
+      if (existsSync(externalTarget)) {
+        rmSync(externalTarget, { recursive: true, force: true });
+      }
+    }
   });
 });
