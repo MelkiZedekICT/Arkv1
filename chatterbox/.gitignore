@@ -4,3 +4,5 @@ dist/
 .chatterbox/
 .env
 coverage/
+worktrees/
+*.tgz

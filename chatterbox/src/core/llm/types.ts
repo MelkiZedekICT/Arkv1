@@ -33,3 +33,16 @@ export interface LlmProvider {
   readonly name: string;
   complete(request: LlmCompletionRequest): Promise<LlmCompletionResult>;
 }
+
+export type LlmStreamChunk = {
+  text?: string;
+  usage?: LlmUsage;
+  finishReason?: 'stop' | 'length' | 'tool_calls' | 'error';
+};
+
+export interface StreamingLlmProvider extends LlmProvider {
+  stream(
+    request: LlmCompletionRequest,
+    onChunk: (chunk: LlmStreamChunk) => void | Promise<void>
+  ): Promise<LlmCompletionResult>;
+}

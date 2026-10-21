@@ -23,6 +23,7 @@ export interface PlanGenerationRequest {
   constraints?: string[];
   maxTasks?: number;
   revisionFeedback?: string;
+  repositoryBrief?: string;
 }
 
 export class PlannerAgent {
@@ -39,7 +40,7 @@ export class PlannerAgent {
   }
 
   async generatePlan(request: PlanGenerationRequest): Promise<ProposedPlan> {
-    const { taskId, goal, constraints, maxTasks, revisionFeedback } = request;
+    const { taskId, goal, constraints, maxTasks, revisionFeedback, repositoryBrief } = request;
     const correlationId = generateId('corr');
 
     // 1. Emit planner_started
@@ -114,6 +115,7 @@ export class PlannerAgent {
         constraints,
         maxTasks,
         revisionFeedback,
+        repositoryBrief,
         previousPlanJson: attempt > 1 ? previousRawText : undefined,
         validationErrors: attempt > 1 ? validationErrors : undefined,
       };

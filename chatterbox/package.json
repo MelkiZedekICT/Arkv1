@@ -1,48 +1,70 @@
 {
-  "name": "chatterbox",
-  "version": "1.0.0",
-  "description": "Terminal-first multi-agent orchestration control room",
-  "main": "dist/cli/index.js",
+  "name": "chatterbox-cli",
+  "version": "0.1.1",
+  "description": "Terminal-native multiplayer control room for AI coding-agent teams.",
   "type": "module",
+  "license": "MIT",
+  "main": "dist/cli/index.js",
   "bin": {
-    "chatterbox": "dist/cli/index.js",
-    "agentfeed": "dist/cli/index.js"
+    "agentfeed": "./dist/cli/index.js"
   },
+  "files": [
+    "dist/cli/index.js",
+    "README.md",
+    "LICENSE"
+  ],
+  "engines": {
+    "node": ">=20"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/MelkiZedekICT/chatterbox-cli.git"
+  },
+  "bugs": {
+    "url": "https://github.com/MelkiZedekICT/chatterbox-cli/issues"
+  },
+  "homepage": "https://github.com/MelkiZedekICT/chatterbox-cli#readme",
+  "keywords": [
+    "ai",
+    "agents",
+    "coding-agent",
+    "developer-tools",
+    "cli",
+    "terminal",
+    "multiplayer-ai",
+    "llm"
+  ],
+  "author": "Google Deepmind / Antigravity Team",
+  "packageManager": "pnpm@10.11.0",
   "scripts": {
-    "build": "tsc",
+    "prepublishOnly": "pnpm typecheck && pnpm lint && pnpm test && pnpm build && node scripts/check-install-perf.mjs",
+    "build": "node scripts/bundle.mjs",
     "typecheck": "tsc --noEmit",
     "start": "tsx src/cli/index.ts",
     "test": "vitest run",
     "lint": "eslint \"src/**/*.{ts,tsx}\"",
     "format": "prettier --write \"src/**/*.{ts,tsx}\""
   },
-  "keywords": [],
-  "author": "",
-  "license": "ISC",
-  "packageManager": "pnpm@10.11.0",
-  "dependencies": {
-    "better-sqlite3": "^11.3.0",
-    "commander": "^12.1.0",
-    "drizzle-orm": "^0.33.0",
-    "ink": "^5.2.1",
-    "react": "^18.3.1",
-    "uuid": "^10.0.0",
-    "zod": "^3.23.8"
-  },
+  "dependencies": {},
   "devDependencies": {
     "@eslint/js": "^9.12.0",
-    "@types/better-sqlite3": "^7.6.11",
     "@types/node": "^26.6.5",
     "@types/react": "^18.3.31",
-    "@types/uuid": "^10.0.0",
+    "commander": "^12.1.0",
+    "diff": "^9.0.0",
     "drizzle-kit": "^0.24.2",
+    "drizzle-orm": "^0.33.0",
+    "esbuild": "^0.28.2",
     "eslint": "^9.12.0",
     "globals": "^15.11.0",
+    "ink": "^5.2.1",
     "ink-testing-library": "^4.0.0",
     "prettier": "^3.3.3",
+    "react": "^18.3.1",
     "tsx": "^4.19.1",
     "typescript": "^5.6.3",
     "typescript-eslint": "^8.8.1",
-    "vitest": "^2.1.2"
+    "vitest": "^2.1.2",
+    "zod": "^3.23.8"
   }
 }

@@ -30,6 +30,8 @@ export const tasks = sqliteTable(
     status: text('status').notNull(),
     createdBy: text('created_by').notNull(),
     visibility: text('visibility').notNull().default('private'),
+    workspace: text('workspace'),
+    metadata: text('metadata'),
     createdAt: text('created_at').notNull(),
     updatedAt: text('updated_at').notNull(),
   },
@@ -142,3 +144,35 @@ export const usageRecords = sqliteTable(
     taskIdIdx: index('usage_records_task_id_idx').on(table.taskId),
   })
 );
+
+export const changesets = sqliteTable(
+  'changesets',
+  {
+    id: text('id').primaryKey(),
+    taskId: text('task_id')
+      .notNull()
+      .references(() => tasks.id, { onDelete: 'cascade' }),
+    nodeId: text('node_id').notNull(),
+    agentRole: text('agent_role').notNull(),
+    operations: text('operations').notNull(),
+    diffs: text('diffs').notNull(),
+    fileHashes: text('file_hashes').notNull(),
+    status: text('status').notNull(),
+    summary: text('summary').notNull(),
+    additions: integer('additions').notNull().default(0),
+    deletions: integer('deletions').notNull().default(0),
+    createdAt: text('created_at').notNull(),
+    updatedAt: text('updated_at').notNull(),
+    approvedBy: text('approved_by'),
+    approvedAt: text('approved_at'),
+    rejectedBy: text('rejected_by'),
+    rejectedAt: text('rejected_at'),
+    appliedAt: text('applied_at'),
+    failureReason: text('failure_reason'),
+  },
+  (table) => ({
+    taskIdIdx: index('changesets_task_id_idx').on(table.taskId),
+    statusIdx: index('changesets_status_idx').on(table.status),
+  })
+);
+

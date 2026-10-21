@@ -58,6 +58,20 @@ export function redactSensitiveText(
 }
 
 /**
+ * Checks whether text contains known API key or credential secret patterns.
+ */
+export function containsSecretPattern(text: string): boolean {
+  if (!text || typeof text !== 'string') {
+    return false;
+  }
+  if (/sk-[A-Za-z0-9_-]{16,}/i.test(text)) return true;
+  if (/ant-[A-Za-z0-9_-]{16,}/i.test(text)) return true;
+  if (/Bearer\s+[A-Za-z0-9_.-]+/i.test(text)) return true;
+  if (/([?&](?:api_key|apiKey|token|secret|password)=)[^&\s]+/i.test(text)) return true;
+  return false;
+}
+
+/**
  * Validates an LLM base URL to ensure safe protocols and reasonable hostnames.
  */
 export function validateLlmBaseUrl(rawUrl: string): { isValid: boolean; normalizedUrl?: string; error?: string } {
@@ -91,3 +105,78 @@ export function validateLlmBaseUrl(rawUrl: string): { isValid: boolean; normaliz
     };
   }
 }
+
+/**
+ * Sanitizes an error to ensure no raw source code lines, stack frames dumping code,
+ * eval contents, caret indicators, or secrets are exposed to the user, logs, or event streams.
+ */
+export function sanitizeErrorMessage(error: unknown): string {
+  if (!error) return 'An unknown error occurred';
+
+  let raw = '';
+  if (error instanceof Error) {
+    raw = error.message;
+  } else if (typeof error === 'string') {
+    raw = error;
+  } else if (typeof error === 'object') {
+    try {
+      raw = JSON.stringify(error);
+    } catch {
+      raw = String(error);
+    }
+  } else {
+    raw = String(error);
+  }
+
+  // 1. Remove markdown code blocks (``` ... ```)
+  let clean = raw.replace(/```[\s\S]*?```/g, '[CODE_SNIPPET_REDACTED]');
+
+  // 2. Remove code frames or lines containing code snippets (e.g., "> 12 | ...", "  13 | ...", " | ^^^")
+  clean = clean.replace(/^\s*(?:>\s*)?(?:\d+)?\s*\|.*$/gm, '[SOURCE_LINE_REDACTED]');
+
+  // 3. Remove compiler/syntax caret pointers and underlines (e.g., "   ^^^^^")
+  clean = clean.replace(/^\s*[\^~]{2,}\s*$/gm, '[SOURCE_LINE_REDACTED]');
+
+  // 4. Remove inline code evaluations or source listings
+  clean = clean.replace(/\b(?:eval|Function|at Object\.<anonymous>)\b[^\n]*/g, '[INTERNAL]');
+
+  // 5. Redact secrets
+  clean = redactSensitiveText(clean);
+
+  return clean.trim();
+}
+
+/**
+ * Sanitizes a stack trace to ensure only safe stack frame signatures remain,
+ * stripping any code frames, inline source snippets, and secret tokens.
+ */
+export function sanitizeStackTrace(stack: string): string {
+  if (!stack || typeof stack !== 'string') return '';
+
+  return stack
+    .replace(/\r\n/g, '\n')
+    .split('\n')
+    .map((rawLine) => {
+      const line = rawLine.trim();
+      // Allow stack frames that begin with 'at '
+      if (line.startsWith('at ')) {
+        // Strip inline eval code from stack lines
+        const strippedEval = line.replace(/eval at [^,]+, /g, '');
+        return '    ' + redactSensitiveText(strippedEval);
+      }
+      // For non-frame lines (e.g. error name/message, or code frames), sanitize them
+      const sanitized = sanitizeErrorMessage(line);
+      if (
+        sanitized.includes('[SOURCE_LINE_REDACTED]') ||
+        sanitized.includes('[CODE_SNIPPET_REDACTED]') ||
+        sanitized.startsWith('>') ||
+        sanitized.includes('|')
+      ) {
+        return '';
+      }
+      return sanitized;
+    })
+    .filter(Boolean)
+    .join('\n');
+}
+

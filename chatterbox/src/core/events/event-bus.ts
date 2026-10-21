@@ -1,6 +1,7 @@
 import { EventEmitter } from 'events';
 import { AgentFeedEvent, AgentFeedEventSchema, AgentFeedEventType } from './event-types.js';
 import { EventStore } from './event-store.js';
+import { logger } from '../../utils/logger.js';
 
 export type EventHandler<T extends AgentFeedEvent = AgentFeedEvent> = (
   event: T
@@ -10,7 +11,7 @@ export class EventBus {
   private emitter = new EventEmitter();
   private processedEventIds = new Set<string>();
 
-  constructor(private store: EventStore) {
+  constructor(private store?: EventStore) {
     this.emitter.setMaxListeners(100);
   }
 
@@ -26,8 +27,10 @@ export class EventBus {
     }
     this.processedEventIds.add(validated.eventId);
 
-    // 3. Persist to per-task JSONL store
-    await this.store.appendEvent(validated as AgentFeedEvent);
+    // 3. Persist to per-task JSONL store if store provided
+    if (this.store) {
+      await this.store.appendEvent(validated as AgentFeedEvent);
+    }
 
     // 4. Emit to typed subscribers safely
     this.dispatchSafe(validated.type, validated);
@@ -49,7 +52,7 @@ export class EventBus {
       try {
         await handler(event as T);
       } catch (err) {
-        console.error(`[EventBus] Unhandled error in listener for "${eventType}":`, err);
+        logger.error(`[EventBus] Unhandled error in listener for "${eventType}"`, err);
       }
     };
 
@@ -90,11 +93,11 @@ export class EventBus {
         const result: unknown = listener(event);
         if (result instanceof Promise) {
           result.catch((err: unknown) => {
-            console.error(`[EventBus] Async listener error for "${eventType}":`, err);
+            logger.error(`[EventBus] Async listener error for "${eventType}"`, err);
           });
         }
       } catch (err) {
-        console.error(`[EventBus] Sync listener error for "${eventType}":`, err);
+        logger.error(`[EventBus] Sync listener error for "${eventType}"`, err);
       }
     }
   }

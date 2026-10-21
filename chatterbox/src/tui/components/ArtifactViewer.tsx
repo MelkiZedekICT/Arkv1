@@ -1,27 +1,38 @@
 import React from 'react';
-import { Box, Text } from 'ink';
+import { Box, Text, useInput } from 'ink';
 import { existsSync, readFileSync } from 'fs';
 import { ArtifactState } from '../hooks/useAgentFeedEvents.js';
+import { Divider } from './Divider.js';
+import { chatterboxAnsi, isNoColor } from '../design/tokens.js';
 
 export interface ArtifactViewerProps {
   artifact: ArtifactState | null;
   onClose: () => void;
 }
 
-export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({ artifact }) => {
+export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({ artifact, onClose }) => {
+  const noColor = isNoColor();
+
+  useInput((input, key) => {
+    if (key.escape || input.toLowerCase() === 'q' || input.toLowerCase() === 'v') {
+      onClose();
+    }
+  });
+
   if (!artifact) {
     return (
-      <Box
-        flexDirection="column"
-        borderStyle="round"
-        borderColor="magenta"
-        paddingX={1}
-      >
-        <Text bold color="magenta">
+      <Box flexDirection="column" marginY={1}>
+        <Divider length={62} marginY={0} />
+        <Text color={noColor ? undefined : chatterboxAnsi.brand} bold>
           ARTIFACT VIEWER
         </Text>
-        <Text dimColor>No artifacts created yet for this task.</Text>
-        <Text dimColor>Press [V] to close.</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textMuted}>
+          No artifacts created yet for this task.
+        </Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}>
+          Press V or Esc to close.
+        </Text>
+        <Divider length={62} marginY={0} />
       </Box>
     );
   }
@@ -31,9 +42,9 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({ artifact }) => {
     try {
       const raw = readFileSync(artifact.path, 'utf-8');
       const lines = raw.split('\n');
-      contentPreview = lines.slice(0, 20).join('\n');
-      if (lines.length > 20) {
-        contentPreview += `\n... (${lines.length - 20} more lines in ${artifact.path})`;
+      contentPreview = lines.slice(0, 16).join('\n');
+      if (lines.length > 16) {
+        contentPreview += `\n... (${lines.length - 16} more lines in ${artifact.path})`;
       }
     } catch {
       contentPreview = 'Error reading artifact file.';
@@ -41,24 +52,27 @@ export const ArtifactViewer: React.FC<ArtifactViewerProps> = ({ artifact }) => {
   }
 
   return (
-    <Box
-      flexDirection="column"
-      borderStyle="round"
-      borderColor="magenta"
-      paddingX={1}
-    >
+    <Box flexDirection="column" marginY={0}>
+      <Divider length={62} marginY={0} />
       <Box flexDirection="row" justifyContent="space-between">
-        <Text bold color="magenta">
-          ARTIFACT PREVIEW: {artifact.title}
+        <Text color={noColor ? undefined : chatterboxAnsi.brand} bold>
+          ARTIFACT: {artifact.title}
         </Text>
-        <Text dimColor>Press [V] to close</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textMuted}>
+          [V or Esc to close]
+        </Text>
       </Box>
       <Box marginY={0}>
-        <Text dimColor>Path: {artifact.path}</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}>
+          Path: {artifact.path}
+        </Text>
       </Box>
       <Box marginY={0}>
-        <Text color="white">{contentPreview}</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textPrimary}>
+          {contentPreview}
+        </Text>
       </Box>
+      <Divider length={62} marginY={0} />
     </Box>
   );
 };

@@ -1,0 +1,25 @@
+{
+  "id": "refactor-helper-function",
+  "name": "Refactor Input Parsing Helper",
+  "goal": "Refactor input parsing helper function to use safe type guards and add tests",
+  "mode": "mock",
+  "workspaceFixture": "core-utils",
+  "expectedFiles": [
+    "src/generated/validation.ts",
+    "tests/generated-validation.test.ts"
+  ],
+  "mustNotModify": [
+    ".env",
+    ".git/index"
+  ],
+  "forbiddenFiles": [
+    ".env",
+    ".git/index"
+  ],
+  "successCriteria": [
+    "Refactor function cleanly",
+    "Apply proposed unified diffs",
+    "Verify zero test regressions",
+    "Zero protected path violations"
+  ]
+}

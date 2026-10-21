@@ -27,10 +27,13 @@ export type TaskNodeStatus = z.infer<typeof TaskNodeStatusSchema>;
 
 export const AgentRoleSchema = z.enum([
   'planner',
+  'explorer',
   'researcher',
   'analyst',
   'writer',
   'reviewer',
+  'coder',
+  'tester',
 ]);
 export type AgentRole = z.infer<typeof AgentRoleSchema>;
 

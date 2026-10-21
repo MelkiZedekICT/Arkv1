@@ -10,6 +10,8 @@ export const TaskSchema = z.object({
   createdAt: z.string().datetime({ message: 'Must be a valid ISO 8601 timestamp' }),
   updatedAt: z.string().datetime({ message: 'Must be a valid ISO 8601 timestamp' }),
   visibility: TaskVisibilitySchema.default('private'),
+  workspace: z.string().nullish().transform((v) => v ?? undefined),
+  metadata: z.record(z.string(), z.unknown()).nullish().transform((v) => v ?? undefined),
 });
 
 export type Task = z.infer<typeof TaskSchema>;

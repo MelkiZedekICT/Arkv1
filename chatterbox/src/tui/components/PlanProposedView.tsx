@@ -1,37 +1,39 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { ProposedPlanState } from '../hooks/useAgentFeedEvents.js';
-import { AgentAvatar } from './AgentAvatar.js';
+import { Divider } from './Divider.js';
+import { chatterboxAnsi, isNoColor } from '../design/tokens.js';
 
 export interface PlanProposedViewProps {
   plan: ProposedPlanState;
 }
 
 export const PlanProposedView: React.FC<PlanProposedViewProps> = ({ plan }) => {
+  const noColor = isNoColor();
+
   return (
-    <Box flexDirection="column" borderStyle="round" borderColor="cyan" paddingX={1} marginY={0}>
+    <Box flexDirection="column" marginY={0}>
+      <Divider length={62} marginY={0} />
+
       <Box flexDirection="row" justifyContent="space-between" marginBottom={0}>
-        <Text bold color="cyan">
+        <Text color={noColor ? undefined : chatterboxAnsi.brand} bold>
           PROPOSED PLAN: {plan.title}
         </Text>
-        <Text bold color="yellow">
-          [AWAITING OPERATOR DECISION]
+        <Text color={noColor ? undefined : chatterboxAnsi.warning} bold>
+          [AWAITING DECISION]
         </Text>
       </Box>
 
-      <Box marginBottom={0}>
-        <Text color="white">{plan.summary}</Text>
+      <Box marginY={0}>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}>{plan.summary}</Text>
       </Box>
 
       {plan.assumptions.length > 0 && (
         <Box flexDirection="column" marginY={0}>
-          <Text bold color="gray">
-            Assumptions:
-          </Text>
+          <Text color={noColor ? undefined : chatterboxAnsi.textSecondary} bold>Assumptions:</Text>
           {plan.assumptions.map((a, i) => (
-            <Text key={i} color="gray">
-              {'  • '}
-              {a}
+            <Text key={i} color={noColor ? undefined : chatterboxAnsi.textMuted}>
+              {'  • '}{a}
             </Text>
           ))}
         </Box>
@@ -39,42 +41,38 @@ export const PlanProposedView: React.FC<PlanProposedViewProps> = ({ plan }) => {
 
       {plan.risks.length > 0 && (
         <Box flexDirection="column" marginY={0}>
-          <Text bold color="red">
-            Identified Risks:
-          </Text>
+          <Text color={noColor ? undefined : chatterboxAnsi.error} bold>Identified Risks:</Text>
           {plan.risks.map((r, i) => (
-            <Text key={i} color="red">
-              {'  ⚠ '}
-              {r}
+            <Text key={i} color={noColor ? undefined : chatterboxAnsi.error}>
+              {'  • '}{r}
             </Text>
           ))}
         </Box>
       )}
 
       <Box flexDirection="column" marginTop={1}>
-        <Text bold color="yellow">
-          TASK GRAPH ({plan.tasks.length} tasks)
+        <Text color={noColor ? undefined : chatterboxAnsi.brand} bold>
+          TASK GRAPH ({plan.tasks.length} stages)
         </Text>
         {plan.tasks.map((task, idx) => {
           const deps = task.dependsOn.length > 0 ? `(after ${task.dependsOn.join(', ')})` : '(root)';
-          const effort = task.estimatedEffort ? `[${task.estimatedEffort.toUpperCase()}]` : '';
 
           return (
             <Box key={task.id} flexDirection="column" marginY={0}>
               <Box flexDirection="row" justifyContent="space-between">
                 <Box flexDirection="row">
-                  <Text color="white" bold>
-                    {idx + 1}. {task.title.padEnd(30)}{' '}
+                  <Text color={noColor ? undefined : chatterboxAnsi.textPrimary} bold>
+                    {idx + 1}. {task.title.padEnd(28)}{' '}
                   </Text>
-                  <AgentAvatar role={task.assignedAgentRole} />
+                  <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}>
+                    [{task.assignedAgentRole.toUpperCase()}]
+                  </Text>
                 </Box>
-                <Text color="gray">
-                  {deps} {effort}
-                </Text>
+                <Text color={noColor ? undefined : chatterboxAnsi.textMuted}>{deps}</Text>
               </Box>
               {task.acceptanceCriteria.length > 0 && (
                 <Box paddingLeft={3}>
-                  <Text dimColor>
+                  <Text color={noColor ? undefined : chatterboxAnsi.textMuted}>
                     ✓ Criteria: {task.acceptanceCriteria.join('; ')}
                   </Text>
                 </Box>
@@ -84,26 +82,18 @@ export const PlanProposedView: React.FC<PlanProposedViewProps> = ({ plan }) => {
         })}
       </Box>
 
-      <Box
-        flexDirection="row"
-        justifyContent="center"
-        borderStyle="double"
-        borderColor="yellow"
-        marginTop={1}
-        paddingX={1}
-      >
-        <Text bold color="yellowBright">
-          [A] Approve Plan
-        </Text>
-        <Text color="white">   |   </Text>
-        <Text bold color="redBright">
-          [R] Reject Plan
-        </Text>
-        <Text color="white">   |   </Text>
-        <Text bold color="cyanBright">
-          [E] Request Revision
-        </Text>
+      <Box flexDirection="row" marginTop={1}>
+        <Text color={noColor ? undefined : chatterboxAnsi.success} bold>A</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}> approve · </Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.error} bold>R</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}> reject · </Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.warning} bold>E</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}> edit plan · </Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textPrimary} bold>M</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}> request revision</Text>
       </Box>
+
+      <Divider length={62} marginY={0} />
     </Box>
   );
 };

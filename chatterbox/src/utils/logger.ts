@@ -1,4 +1,4 @@
-import { redactSensitiveText } from './security.js';
+import { redactSensitiveText, sanitizeErrorMessage, sanitizeStackTrace } from './security.js';
 
 export type LogLevel = 'debug' | 'info' | 'warn' | 'error';
 
@@ -24,11 +24,12 @@ class Logger {
   }
 
   error(message: string, error?: unknown): void {
-    const cleanMessage = redactSensitiveText(message);
+    const cleanMessage = sanitizeErrorMessage(message);
     if (this.isVerbose && error instanceof Error && error.stack) {
-      console.error(`[ERROR] ${cleanMessage}\n${redactSensitiveText(error.stack)}`);
-    } else if (error instanceof Error) {
-      console.error(`[ERROR] ${cleanMessage}: ${redactSensitiveText(error.message)}`);
+      const sanitizedStack = sanitizeStackTrace(error.stack);
+      console.error(`[ERROR] ${cleanMessage}\n${sanitizedStack}`);
+    } else if (error) {
+      console.error(`[ERROR] ${cleanMessage}: ${sanitizeErrorMessage(error)}`);
     } else {
       console.error(`[ERROR] ${cleanMessage}`);
     }

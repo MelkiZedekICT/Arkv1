@@ -1,0 +1,27 @@
+{
+  "id": "fix-failing-test",
+  "name": "Fix Failing Test Suite",
+  "goal": "Fix failing assertion in calculation helper and ensure tests pass",
+  "mode": "mock",
+  "workspaceFixture": "calc-lib",
+  "expectedFiles": [
+    "src/generated/validation.ts",
+    "tests/generated-validation.test.ts"
+  ],
+  "mustNotModify": [
+    ".env",
+    ".git/HEAD",
+    "node_modules/package.json"
+  ],
+  "forbiddenFiles": [
+    ".env",
+    ".git/HEAD",
+    "node_modules/package.json"
+  ],
+  "successCriteria": [
+    "Fix logic bug without regressions",
+    "Run allowlisted test command",
+    "Record tests passed",
+    "Zero protected path violations"
+  ]
+}

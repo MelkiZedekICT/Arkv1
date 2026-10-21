@@ -7,7 +7,7 @@ import { AgentRepository } from '../../core/storage/repositories/agent.repositor
 import { logger } from '../../utils/logger.js';
 
 export const initCommand = new Command('init')
-  .description('Initialize Chatterbox/AgentFeed in the current directory')
+  .description('Initialize Chatterbox in the current directory')
   .action(async () => {
     try {
       const storageDir = resolveStorageDir();

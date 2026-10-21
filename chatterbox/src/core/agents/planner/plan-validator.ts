@@ -41,8 +41,8 @@ export class PlanValidator {
     // 4. Role Assignment & Acceptance Criteria
     for (const task of plan.tasks) {
       const role = task.assignedAgentRole as string;
-      if (role === 'planner' || role === 'user' || role === 'system') {
-        errors.push(`Task "${task.id}" is assigned to invalid role "${role}". Planner cannot assign tasks to itself, user, or system.`);
+      if (role === 'user' || role === 'system') {
+        errors.push(`Task "${task.id}" is assigned to invalid role "${role}". Planner cannot assign tasks to user or system.`);
       }
 
       if (!task.acceptanceCriteria || task.acceptanceCriteria.length === 0) {

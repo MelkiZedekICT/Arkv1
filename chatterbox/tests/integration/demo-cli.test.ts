@@ -11,7 +11,9 @@ describe('Demo CLI Integration', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'chatterbox-test-democli-'));
-    execSync('pnpm run build', { cwd: projectRoot, stdio: 'pipe' });
+    if (!existsSync(cliEntry)) {
+      execSync('pnpm run build', { cwd: projectRoot, stdio: 'pipe' });
+    }
     execSync(`node "${cliEntry}" init`, {
       cwd: tempDir,
       stdio: 'pipe',

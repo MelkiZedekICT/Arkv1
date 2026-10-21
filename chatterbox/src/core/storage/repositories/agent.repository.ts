@@ -1,6 +1,4 @@
-import { eq } from 'drizzle-orm';
 import { AppDatabase } from '../database.js';
-import { agents } from '../schema.js';
 import { Agent, AgentSchema } from '../../models/agent.js';
 import { AgentRole } from '../../models/enums.js';
 import { getTimestamp } from '../../../utils/time.js';
@@ -58,11 +56,11 @@ export const DEFAULT_AGENTS: Omit<Agent, 'createdAt' | 'updatedAt'>[] = [
     id: 'agent_reviewer',
     name: 'Reviewer',
     role: 'reviewer',
-    description: 'Audits deliverables against requirements, checks source consistency, and flags quality deficits.',
+    description: 'Audits deliverables against acceptance criteria, fact-checks assertions, and flags safety or tone violations.',
     systemPrompt:
-      'You are the Reviewer agent. Your mission is to critique draft deliverables, check compliance with acceptance criteria, audit quality, and request revisions when standards are not met.',
-    tools: ['linter', 'diff_checker'],
-    permissions: ['request_revision', 'approve_artifact'],
+      'You are the Reviewer agent. Your mission is to audit completed artifacts against strict acceptance criteria, check facts, verify citations, and provide structured approval verdicts.',
+    tools: ['diff_auditor', 'criteria_checker'],
+    permissions: ['review_artifact', 'approve_artifact'],
     model: 'gpt-4o',
     isActive: true,
   },
@@ -71,20 +69,9 @@ export const DEFAULT_AGENTS: Omit<Agent, 'createdAt' | 'updatedAt'>[] = [
 export class AgentRepository {
   constructor(private db: AppDatabase) {}
 
-  private mapRowToModel(row: typeof agents.$inferSelect): Agent {
-    return AgentSchema.parse({
-      id: row.id,
-      name: row.name,
-      role: row.role,
-      description: row.description,
-      systemPrompt: row.systemPrompt,
-      tools: typeof row.tools === 'string' ? JSON.parse(row.tools) : row.tools,
-      permissions: typeof row.permissions === 'string' ? JSON.parse(row.permissions) : row.permissions,
-      model: row.model,
-      isActive: Boolean(row.isActive),
-      createdAt: row.createdAt,
-      updatedAt: row.updatedAt,
-    });
+  async create(agent: Agent): Promise<Agent> {
+    const validated = AgentSchema.parse(agent);
+    return this.db.createAgent(validated);
   }
 
   async seedDefaultAgents(): Promise<Agent[]> {
@@ -102,19 +89,7 @@ export class AgentRepository {
         createdAt: timestamp,
         updatedAt: timestamp,
       };
-      await this.db.insert(agents).values({
-        id: agent.id,
-        name: agent.name,
-        role: agent.role,
-        description: agent.description,
-        systemPrompt: agent.systemPrompt,
-        tools: JSON.stringify(agent.tools),
-        permissions: JSON.stringify(agent.permissions),
-        model: agent.model,
-        isActive: agent.isActive,
-        createdAt: agent.createdAt,
-        updatedAt: agent.updatedAt,
-      });
+      await this.db.createAgent(agent);
       seeded.push(agent);
     }
 
@@ -122,19 +97,14 @@ export class AgentRepository {
   }
 
   async list(): Promise<Agent[]> {
-    const rows = await this.db.select().from(agents);
-    return rows.map((r) => this.mapRowToModel(r));
+    return this.db.listAgents();
   }
 
   async getByRole(role: AgentRole): Promise<Agent | null> {
-    const rows = await this.db.select().from(agents).where(eq(agents.role, role)).limit(1);
-    if (rows.length === 0) return null;
-    return this.mapRowToModel(rows[0]);
+    return this.db.getAgentByRole(role);
   }
 
   async getById(id: string): Promise<Agent | null> {
-    const rows = await this.db.select().from(agents).where(eq(agents.id, id)).limit(1);
-    if (rows.length === 0) return null;
-    return this.mapRowToModel(rows[0]);
+    return this.db.getAgentById(id);
   }
 }

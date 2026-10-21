@@ -1,5 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { redactSensitiveText, validateLlmBaseUrl } from '../../src/utils/security.js';
+import {
+  redactSensitiveText,
+  validateLlmBaseUrl,
+  sanitizeErrorMessage,
+  sanitizeStackTrace,
+} from '../../src/utils/security.js';
 
 describe('Security & Redaction Utilities', () => {
   it('redacts explicit secret keys passed to it', () => {
@@ -54,5 +59,36 @@ describe('Security & Redaction Utilities', () => {
     const remoteHttp = validateLlmBaseUrl('http://external-api.evil.com/v1');
     expect(remoteHttp.isValid).toBe(false);
     expect(remoteHttp.error).toContain('Insecure HTTP protocol');
+  });
+
+  it('sanitizes error messages to prevent exposing source code and code frames', () => {
+    const codeSnippetError = new Error(
+      'Execution failed at runtime:\n```typescript\nconst apiSecret = "super-secret-pass";\nexecute(apiSecret);\n```\n> 45 | const apiSecret = "super-secret-pass";\n     | ^^^^^^^^^^^^^^^^^'
+    );
+    const sanitized = sanitizeErrorMessage(codeSnippetError);
+
+    expect(sanitized).not.toContain('super-secret-pass');
+    expect(sanitized).not.toContain('execute(apiSecret)');
+    expect(sanitized).not.toContain('const apiSecret');
+    expect(sanitized).toContain('[CODE_SNIPPET_REDACTED]');
+    expect(sanitized).toContain('[SOURCE_LINE_REDACTED]');
+  });
+
+  it('sanitizes stack traces keeping frame locations while purging source code lines', () => {
+    const rawStack = `Error: Something blew up
+> 14 |   const password = 'leakedPassword123';
+     |   ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+    at runProcess (C:\\app\\src\\core\\engine\\scheduler.ts:45:10)
+    at eval at <anonymous> (C:\\app\\src\\core\\tools.ts:12:3), <anonymous>:1:5
+    at processTicksAndRejections (node:internal/process/task_queues:104:5)`;
+
+    const sanitizedStack = sanitizeStackTrace(rawStack);
+
+    expect(sanitizedStack).not.toContain('leakedPassword123');
+    expect(sanitizedStack).not.toContain('const password');
+    expect(sanitizedStack).not.toContain('^^^^^');
+    expect(sanitizedStack).toContain('at runProcess');
+    expect(sanitizedStack).toContain('at processTicksAndRejections');
+    expect(sanitizedStack).not.toContain('eval at');
   });
 });

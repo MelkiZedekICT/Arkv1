@@ -1,34 +1,20 @@
 import React from 'react';
-import { Box, Text } from 'ink';
 import { FeedItem } from '../hooks/useAgentFeedEvents.js';
-import { AgentAvatar } from './AgentAvatar.js';
+import { AgentLine } from './AgentLine.js';
 
 export interface EventLineProps {
   item: FeedItem;
+  maxWidth?: number;
 }
 
-export const EventLine: React.FC<EventLineProps> = ({ item }) => {
-  // Render content and highlight @mentions
-  const renderContentWithMentions = (text: string) => {
-    const parts = text.split(/(@[a-zA-Z0-9_-]+)/g);
-    return parts.map((part, index) => {
-      if (part.startsWith('@')) {
-        return (
-          <Text key={index} color="cyanBright" bold>
-            {part}
-          </Text>
-        );
-      }
-      return <Text key={index}>{part}</Text>;
-    });
-  };
-
+export const EventLine: React.FC<EventLineProps> = ({ item, maxWidth = 100 }) => {
   return (
-    <Box flexDirection="row">
-      <Text dimColor>{item.timestamp} </Text>
-      <AgentAvatar role={item.role} />
-      <Text> </Text>
-      {renderContentWithMentions(item.content)}
-    </Box>
+    <AgentLine
+      role={item.role || 'system'}
+      message={item.content}
+      kind={item.kind}
+      timestamp={item.timestamp}
+      maxWidth={maxWidth}
+    />
   );
 };

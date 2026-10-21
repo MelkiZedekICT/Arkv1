@@ -1,5 +1,6 @@
 import React from 'react';
 import { Text } from 'ink';
+import { chatterboxAnsi, isNoColor } from '../design/tokens.js';
 
 export function getRoleColor(role: string): string {
   switch (role.toLowerCase()) {
@@ -26,6 +27,10 @@ export interface AgentAvatarProps {
 }
 
 export const AgentAvatar: React.FC<AgentAvatarProps> = ({ role }) => {
-  const color = getRoleColor(role);
-  return <Text color={color} bold>{`[${role.toLowerCase()}]`}</Text>;
+  const noColor = isNoColor();
+  return (
+    <Text color={noColor ? undefined : chatterboxAnsi.textPrimary} bold>
+      {`[${role.toUpperCase()}]`}
+    </Text>
+  );
 };

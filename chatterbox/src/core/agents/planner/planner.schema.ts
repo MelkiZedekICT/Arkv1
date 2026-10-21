@@ -1,10 +1,14 @@
 import { z } from 'zod';
 
 export const AgentSpecialistRoleSchema = z.enum([
+  'explorer',
+  'planner',
   'researcher',
   'analyst',
   'writer',
   'reviewer',
+  'coder',
+  'tester',
 ]);
 export type AgentSpecialistRole = z.infer<typeof AgentSpecialistRoleSchema>;
 

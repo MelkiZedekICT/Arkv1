@@ -10,7 +10,9 @@ describe('Run Command & Config Integration', () => {
   const cliEntry = join(projectRoot, 'dist/cli/index.js');
 
   beforeAll(() => {
-    execSync('pnpm run build', { cwd: projectRoot, stdio: 'pipe' });
+    if (!existsSync(cliEntry)) {
+      execSync('pnpm run build', { cwd: projectRoot, stdio: 'pipe' });
+    }
   });
 
   beforeEach(() => {
@@ -61,7 +63,7 @@ describe('Run Command & Config Integration', () => {
 
   it('runs planning end-to-end with --mock --approve, persisting task nodes and events', () => {
     const runOutput = execSync(
-      `node "${cliEntry}" run "Build an intelligent rate-limiter service" --mock --no-tui --approve --title "Rate Limiter"`,
+      `node "${cliEntry}" run "Build an intelligent rate-limiter service" --mock --no-tui --approve --plan-only --title "Rate Limiter"`,
       {
         cwd: tempDir,
         encoding: 'utf-8',

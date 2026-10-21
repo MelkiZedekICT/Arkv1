@@ -11,8 +11,9 @@ describe('CLI Commands End-to-End', () => {
 
   beforeEach(() => {
     tempDir = mkdtempSync(join(tmpdir(), 'chatterbox-test-cli-'));
-    // Build first to ensure dist is up to date
-    execSync('pnpm run build', { cwd: projectRoot, stdio: 'pipe' });
+    if (!existsSync(cliEntry)) {
+      execSync('pnpm run build', { cwd: projectRoot, stdio: 'pipe' });
+    }
     // Initialize in tempDir
     execSync(`node "${cliEntry}" init`, {
       cwd: tempDir,
@@ -81,6 +82,21 @@ describe('CLI Commands End-to-End', () => {
     expect(Array.isArray(parsed)).toBe(true);
     expect(parsed[0].taskId).toBe(taskId);
     expect(parsed[0].type).toBe('task_created');
+    // 6. Run approvals <task-id>
+    const approvalsOutput = execSync(`node "${cliEntry}" approvals ${taskId}`, {
+      cwd: tempDir,
+      encoding: 'utf-8',
+    });
+    expect(approvalsOutput).toContain('No approval records found');
+
+    // 7. Run approvals <task-id> --json
+    const approvalsJson = execSync(`node "${cliEntry}" approvals ${taskId} --json`, {
+      cwd: tempDir,
+      encoding: 'utf-8',
+    });
+    const parsedApprovals = JSON.parse(approvalsJson);
+    expect(Array.isArray(parsedApprovals)).toBe(true);
+    expect(parsedApprovals.length).toBe(0);
   });
 
   it('returns non-zero exit code when task is not found', () => {
