@@ -145,7 +145,7 @@ describe('Milestone 10: Install Performance & Zero-Dependency Distribution', () 
   it('8. package.json declares zero runtime dependencies', () => {
     const pkg = JSON.parse(readFileSync(join(__dirname, '../../package.json'), 'utf-8'));
     expect(pkg.dependencies).toEqual({});
-    expect(pkg.bin.agentfeed).toBe('./dist/cli/index.js');
+    expect(pkg.bin.agentfeed).toBe('dist/cli/index.js');
     expect(pkg.files).toEqual(['dist/cli/index.js', 'README.md', 'LICENSE']);
     expect(pkg.engines.node).toBe('>=20');
   });

@@ -13,9 +13,16 @@ const maxInstallDurationMs = 30000; // 30 seconds
 const maxRuntimeDeps = 5; // budget: max 5, target: 0
 const maxHelpDurationMs = 1500; // spawn + node startup budget on Windows
 
+// Sanitize execution environment for child npm processes so nested pack/install
+// always perform real packaging and file writing even during dry-run releases
+const cleanEnv = { ...process.env };
+delete cleanEnv.npm_config_dry_run;
+delete cleanEnv.npm_lifecycle_event;
+delete cleanEnv.npm_lifecycle_script;
+
 // 1. Run npm pack
 console.log('[1/6] Packaging tarball with npm pack...');
-const packOutput = execSync('npm pack --json', { cwd: rootDir, encoding: 'utf-8' });
+const packOutput = execSync('npm pack --dry-run=false --json', { cwd: rootDir, env: cleanEnv, encoding: 'utf-8' });
 const packInfo = JSON.parse(packOutput)[0];
 const tarballName = packInfo.filename;
 const tarballPath = join(rootDir, tarballName);
@@ -42,8 +49,9 @@ try {
   // 3. Install packed tarball
   console.log('[3/6] Measuring clean npm install duration...');
   const installStart = process.hrtime.bigint();
-  const installResult = execSync(`npm install "${tarballPath}"`, {
+  const installResult = execSync(`npm install "${tarballPath}" --dry-run=false`, {
     cwd: tempDir,
+    env: cleanEnv,
     encoding: 'utf-8',
     stdio: 'pipe',
   });

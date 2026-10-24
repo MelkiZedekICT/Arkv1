@@ -6,7 +6,7 @@
   "license": "MIT",
   "main": "dist/cli/index.js",
   "bin": {
-    "agentfeed": "./dist/cli/index.js"
+    "agentfeed": "dist/cli/index.js"
   },
   "files": [
     "dist/cli/index.js",
