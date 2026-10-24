@@ -35,11 +35,16 @@ export type ApprovalRequest = {
   reason: string;
 };
 
+export type DecisionType = 'approve' | 'reject' | 'edit_instruction' | 'view_diff';
+
 export type ApprovalDecision = {
   approved: boolean;
+  decisionType?: DecisionType;
   approverId: string;
   decidedAt: string;
   reason?: string;
+  editedInstruction?: string;
+  diffHash?: string;
 };
 
 export type PolicyEvaluation = {

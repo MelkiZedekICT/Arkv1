@@ -1,7 +1,7 @@
 import React from 'react';
 import { Box, Text } from 'ink';
 import { FeedItem } from '../hooks/useAgentFeedEvents.js';
-import { EventLine } from './EventLine.js';
+import { MessageSelector } from './MessageSelector.js';
 import { Divider } from './Divider.js';
 import { chatterboxAnsi, isNoColor } from '../design/tokens.js';
 
@@ -10,6 +10,8 @@ export interface AgentFeedProps {
   maxVisible?: number;
   activeRole?: string;
   activeDescription?: string;
+  selectedIndex?: number;
+  isSelecting?: boolean;
 }
 
 export const AgentFeed: React.FC<AgentFeedProps> = ({
@@ -17,9 +19,10 @@ export const AgentFeed: React.FC<AgentFeedProps> = ({
   maxVisible = 8,
   activeRole,
   activeDescription,
+  selectedIndex = -1,
+  isSelecting = false,
 }) => {
   const noColor = isNoColor();
-  const visibleItems = items.slice(-maxVisible);
 
   return (
     <Box flexDirection="column" marginY={0}>
@@ -39,15 +42,12 @@ export const AgentFeed: React.FC<AgentFeedProps> = ({
       )}
 
       {/* Live Agent Stream */}
-      <Box flexDirection="column" minHeight={4}>
-        {visibleItems.length === 0 ? (
-          <Text color={noColor ? undefined : chatterboxAnsi.textMuted}>
-            Awaiting specialist agent activity...
-          </Text>
-        ) : (
-          visibleItems.map((item) => <EventLine key={item.id} item={item} />)
-        )}
-      </Box>
+      <MessageSelector
+        items={items}
+        selectedIndex={selectedIndex}
+        isSelecting={isSelecting}
+        maxVisible={maxVisible}
+      />
     </Box>
   );
 };

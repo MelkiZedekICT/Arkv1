@@ -1,27 +1,22 @@
 import { LlmProvider } from './types.js';
 import { LlmConfig } from '../config/schema.js';
-import { MockPlannerProvider } from './mock-planner-provider.js';
-import { OpenAiCompatibleProvider } from './openai-compatible-provider.js';
+import { createModelProvider } from './provider-factory.js';
 
 export * from './types.js';
+export * from './model-provider.js';
+export * from './provider-factory.js';
 export * from './mock-planner-provider.js';
+export * from './mock-specialist-provider.js';
 export * from './openai-compatible-provider.js';
+export * from './providers/mock-provider.js';
+export * from './providers/ollama-provider.js';
+export * from './providers/openrouter-provider.js';
+export * from './providers/custom-provider.js';
 
+/**
+ * Backwards-compatible factory for creating an LLM provider.
+ * Uses the enhanced ModelProvider under the hood.
+ */
 export function createLlmProvider(config: LlmConfig, forceMock = false): LlmProvider {
-  if (forceMock || config.provider === 'mock') {
-    return new MockPlannerProvider();
-  }
-
-  if (config.provider === 'openai-compatible') {
-    return new OpenAiCompatibleProvider({
-      baseUrl: config.baseUrl,
-      model: config.model,
-      apiKeyEnvVar: config.apiKeyEnvVar,
-      timeoutMs: config.timeoutMs,
-      maxRetries: config.maxRetries,
-    });
-  }
-
-  // Fallback to mock provider
-  return new MockPlannerProvider();
+  return createModelProvider(config, forceMock);
 }

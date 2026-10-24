@@ -14,11 +14,17 @@ import { configCommand } from './commands/config.js';
 import { approvalsCommand } from './commands/approvals.js';
 import { workflowsCommand } from './commands/workflows.js';
 import { evalCommand } from './commands/eval.js';
+import { welcomeCommand } from './commands/welcome.js';
+import { setupCommand } from './commands/setup.js';
+import { modelCommand } from './commands/model.js';
+import { missionCommand } from './commands/mission.js';
+import { authCommand } from './commands/auth.js';
+import { providerCommand } from './commands/provider.js';
 import { logger } from '../utils/logger.js';
 import { symbols } from '../tui/design/symbols.js';
 import { isNoColor } from '../tui/design/tokens.js';
 
-//unhandled exceptions to prevent exposing raw stack traces or internal source code paths
+// unhandled exceptions to prevent exposing raw stack traces or internal source code paths
 process.on('uncaughtException', (err: unknown) => {
   const message = err instanceof Error ? err.message : String(err);
   logger.error(message);
@@ -35,10 +41,10 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
 const pkgPath = join(__dirname, '../../package.json');
-let version = '0.1.1';
+let version = '0.2.0';
 try {
   const pkgInfo = JSON.parse(readFileSync(pkgPath, 'utf8'));
-  version = pkgInfo.version || '0.1.1';
+  version = pkgInfo.version || '0.2.0';
 } catch {
   // fallback if running from test or bundled environment
 }
@@ -67,6 +73,12 @@ if (fullLogo) {
   program.addHelpText('before', header);
 }
 
+program.addCommand(welcomeCommand);
+program.addCommand(setupCommand);
+program.addCommand(modelCommand);
+program.addCommand(missionCommand);
+program.addCommand(authCommand);
+program.addCommand(providerCommand);
 program.addCommand(initCommand);
 program.addCommand(taskCreateCommand);
 program.addCommand(tasksCommand);
@@ -80,5 +92,9 @@ program.addCommand(configCommand);
 program.addCommand(workflowsCommand);
 program.addCommand(evalCommand);
 
-await program.parseAsync(process.argv);
-
+// If no arguments provided, launch the welcome screen front door
+if (process.argv.length <= 2) {
+  await welcomeCommand.parseAsync(['node', 'agentfeed', 'welcome']);
+} else {
+  await program.parseAsync(process.argv);
+}

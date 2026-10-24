@@ -11,6 +11,7 @@ export interface StatusBarProps {
   awaitingApproval: boolean;
   awaitingPlanDecision?: boolean;
   isShowingHelp?: boolean;
+  isSelectingMessage?: boolean;
   failed?: boolean;
 }
 
@@ -24,6 +25,7 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   awaitingApproval,
   awaitingPlanDecision,
   isShowingHelp,
+  isSelectingMessage,
   failed,
 }) => {
   const shortcuts: ShortcutItem[] = [];
@@ -31,6 +33,10 @@ export const StatusBar: React.FC<StatusBarProps> = ({
   if (isShowingHelp) {
     shortcuts.push({ keyLabel: '?', action: 'close help' });
     shortcuts.push({ keyLabel: 'Esc', action: 'close' });
+  } else if (isSelectingMessage) {
+    shortcuts.push({ keyLabel: '↑/↓', action: 'navigate', color: 'white' });
+    shortcuts.push({ keyLabel: 'Enter', action: 'actions', color: 'green' });
+    shortcuts.push({ keyLabel: 'Esc', action: 'cancel', color: 'gray' });
   } else if (awaitingPlanDecision) {
     shortcuts.push({ keyLabel: 'A', action: 'approve plan', color: 'green' });
     shortcuts.push({ keyLabel: 'R', action: 'reject plan', color: 'red' });
@@ -73,8 +79,10 @@ export const StatusBar: React.FC<StatusBarProps> = ({
     shortcuts.push({ keyLabel: 'Q', action: 'exit', color: 'gray' });
   } else {
     // Normal running state
+    shortcuts.push({ keyLabel: '↑/↓', action: 'select message', color: 'white' });
+    shortcuts.push({ keyLabel: 'Enter', action: 'actions', color: 'white' });
     shortcuts.push({ keyLabel: 'P', action: 'pause', color: 'yellow' });
-    shortcuts.push({ keyLabel: 'M', action: 'mention', color: 'white' });
+    shortcuts.push({ keyLabel: '/model', action: 'switch', color: 'white' });
     if (hasDiff) {
       shortcuts.push({
         keyLabel: 'V',

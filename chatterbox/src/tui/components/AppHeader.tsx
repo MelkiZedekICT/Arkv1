@@ -1,6 +1,6 @@
 import React from 'react';
 import { Box, Text } from 'ink';
-import { ChatterboxLogo } from './ChatterboxLogo.js';
+import { symbols } from '../design/symbols.js';
 import { Divider } from './Divider.js';
 import { chatterboxAnsi, isNoColor } from '../design/tokens.js';
 
@@ -18,6 +18,8 @@ export interface AppHeaderProps {
   };
   completedNodes?: number;
   totalNodes?: number;
+  provider?: string;
+  model?: string;
 }
 
 export const AppHeader: React.FC<AppHeaderProps> = ({
@@ -30,6 +32,8 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   gitInfo,
   completedNodes = 0,
   totalNodes = 7,
+  provider,
+  model,
 }) => {
   const noColor = isNoColor();
 
@@ -47,7 +51,21 @@ export const AppHeader: React.FC<AppHeaderProps> = ({
   return (
     <Box flexDirection="column" marginY={0}>
       {/* Brand Header */}
-      <ChatterboxLogo variant="compact" version="v0.1.0" />
+      <Box flexDirection="row">
+        <Text color={noColor ? undefined : chatterboxAnsi.brand} bold>
+          {symbols.logo.compactMark}{' '}
+        </Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textPrimary} bold>
+          Chatterbox
+        </Text>
+        {provider && model ? (
+          <Text color={noColor ? undefined : chatterboxAnsi.textMuted}>
+            {' '}· {provider} · {model}
+          </Text>
+        ) : (
+          <Text color={noColor ? undefined : chatterboxAnsi.textMuted}> · v0.2.0</Text>
+        )}
+      </Box>
 
       {/* Task & Workspace Metadata */}
       <Box flexDirection="column" marginY={0}>

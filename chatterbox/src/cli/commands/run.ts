@@ -3,6 +3,8 @@ import { join } from 'path';
 import React from 'react';
 import { render } from 'ink';
 import { loadConfig, resolveStorageDir } from '../../core/config/config.js';
+import { LlmConfig } from '../../core/config/schema.js';
+import { loadStoredCredentials } from '../../core/config/credential-store.js';
 import { getDatabase } from '../../core/storage/database.js';
 import { TaskRepository } from '../../core/storage/repositories/task.repository.js';
 import { TaskNodeRepository } from '../../core/storage/repositories/task-node.repository.js';
@@ -34,11 +36,13 @@ import { logger } from '../../utils/logger.js';
 import { redactSensitiveText, sanitizeErrorMessage } from '../../utils/security.js';
 import { App, AppController } from '../../tui/App.js';
 import { ProposedPlanTaskState } from '../../tui/hooks/useAgentFeedEvents.js';
-
 import { workspaceService, WorkspaceMode } from '../../core/workspace/workspace.service.js';
 import { gitService } from '../../core/workspace/git.service.js';
 import { defaultWorkflowRegistry } from '../../core/workflows/workflow-registry.js';
 import { symbols } from '../../tui/design/symbols.js';
+import { MissionLedger } from '../../core/ledger/mission-ledger.js';
+import { WorkspaceLockManager } from '../../core/security/sandbox/workspace-lock.js';
+import { MissionEventType, MissionRecord } from '../../core/ledger/types.js';
 
 const bold = (s: string) => `\x1b[1m${s}\x1b[0m`;
 const dim = (s: string) => `\x1b[2m${s}\x1b[0m`;
@@ -58,7 +62,7 @@ interface RunCommandOptions {
   title?: string;
   visibility?: 'public' | 'private';
   maxTasks?: number;
-  provider?: 'mock' | 'openai-compatible';
+  provider?: string;
   model?: string;
   baseUrl?: string;
   tui: boolean;
@@ -102,6 +106,7 @@ export const runCommand = new Command('run')
   .option('--reject', 'Automatically reject the proposed plan')
   .option('--revise <feedback>', 'Automatically request plan revision with specified feedback')
   .action(async (goal: string, options: RunCommandOptions) => {
+    loadStoredCredentials();
     const config = loadConfig();
     const baseDir = resolveStorageDir();
     const dbPath = join(baseDir, 'local.db');
@@ -118,22 +123,27 @@ export const runCommand = new Command('run')
 
     // Prepare LLM provider
     const llmConfig = { ...config.llm };
-    if (options.provider) llmConfig.provider = options.provider;
+    if (options.provider) llmConfig.provider = options.provider as LlmConfig['provider'];
     if (options.model) llmConfig.model = options.model;
     if (options.baseUrl) llmConfig.baseUrl = options.baseUrl;
 
     const forceMock = Boolean(options.mock || llmConfig.provider === 'mock');
     const apiKeyVar = llmConfig.apiKeyEnvVar || 'OPENAI_API_KEY';
 
-    if (!forceMock && llmConfig.provider === 'openai-compatible' && (!process.env[apiKeyVar] || process.env[apiKeyVar]?.trim().length === 0)) {
-      const banner = symbols.logo.getCompactHeader('v0.1.0');
+    const isMock = forceMock || llmConfig.provider === 'mock';
+    const isNoKeyRequired = isMock || llmConfig.provider === 'ollama';
+    const isKeyMissing = !process.env[apiKeyVar] || process.env[apiKeyVar]?.trim().length === 0;
+
+    if (!isNoKeyRequired && isKeyMissing) {
+      const banner = symbols.logo.getCompactHeader('v0.2.0');
       logger.info(`\n\x1b[33m${banner}\x1b[0m`);
       logger.info(bold(red(`Configuration Error: Missing API Key (${apiKeyVar})\n`)));
-      logger.info(`Real LLM mode requires an API key in the ${bold(apiKeyVar)} environment variable.`);
-      logger.info(`\nTo run in real BYOK mode with your LLM provider:`);
+      logger.info(`Real LLM mode with provider "${llmConfig.provider}" requires an API key in ${bold(apiKeyVar)}.`);
+      logger.info(`\nTo configure your provider and key interactively:`);
+      logger.info(`  ${cyan('agentfeed setup')}`);
+      logger.info(`\nOr export the environment variable:`);
       logger.info(`  ${cyan(`export ${apiKeyVar}="sk-..."`)}`);
-      logger.info(`  ${cyan(`agentfeed run "${goal}" --workspace ./my-project`)}`);
-      logger.info(`\nTo run offline in deterministic mock mode without an API key:`);
+      logger.info(`\nOr run offline in deterministic mock mode without an API key:`);
       logger.info(`  ${cyan(`agentfeed run "${goal}" --workspace ./my-project --mock --fast`)}\n`);
       process.exit(1);
     }
@@ -161,11 +171,73 @@ export const runCommand = new Command('run')
 
     const gitInfo = gitService.probeGit(resolvedWorkspace.absoluteRoot);
 
+    // Initialize Mission Ledger & Workspace Lock
+    const missionLedger = new MissionLedger(baseDir);
+    const lockManager = new WorkspaceLockManager(baseDir);
+
+    let missionRecord: MissionRecord | undefined;
+    try {
+      missionRecord = await missionLedger.startMission({
+        goal,
+        workspaceRoot: resolvedWorkspace.absoluteRoot,
+        provider: {
+          name: llmConfig.provider,
+          type: llmConfig.provider,
+          endpoint: llmConfig.baseUrl,
+        },
+        model: llmConfig.model,
+      });
+      lockManager.acquireWorkspaceLock(missionRecord.mission_id, resolvedWorkspace.absoluteRoot);
+    } catch (err: unknown) {
+      logger.error(sanitizeErrorMessage(err));
+      process.exit(1);
+    }
+
+    const releaseLock = () => {
+      if (missionRecord) {
+        lockManager.releaseWorkspaceLock(missionRecord.mission_id);
+      }
+    };
+    process.on('exit', releaseLock);
+
     // Create Task record
     const taskId = generateId('task');
     const taskTitle = options.title || (goal.length > 60 ? `${goal.slice(0, 57)}...` : goal);
     const correlationId = generateId('corr');
     const concurrencyNum = parseInt(options.concurrency || '3', 10) || 3;
+
+    // Stream events to Mission Ledger
+    eventBus.on('*', async (evt) => {
+      try {
+        const evtType = evt.type as string;
+        let lType: MissionEventType | null = null;
+        if (evtType === 'task_created') lType = 'goal_set';
+        else if (evtType === 'plan_created' || evtType === 'plan_proposed') lType = 'plan_created';
+        else if (evtType === 'plan_revision_requested') lType = 'plan_revised';
+        else if (evtType === 'agent_message') lType = 'agent_message';
+        else if (evtType === 'node_started') lType = 'task_started';
+        else if (evtType === 'node_completed') lType = 'task_completed';
+        else if (evtType === 'artifact_created') lType = 'file_created';
+        else if (evtType === 'changeset_proposed') lType = 'diff_created';
+        else if (evtType === 'approval_requested') lType = 'approval_requested';
+        else if (evtType === 'approval_granted') lType = 'approved';
+        else if (evtType === 'approval_denied') lType = 'rejected';
+        else if (evtType === 'task_completed') lType = 'mission_completed';
+        else if (evtType === 'task_failed') lType = 'mission_failed';
+
+        if (lType) {
+          await missionLedger.appendEvent({
+            actor: evt.actorId || 'system',
+            actor_type: evt.actorType === 'agent' ? 'agent' : evt.actorType === 'user' ? 'human' : 'system',
+            event_type: lType,
+            summary: typeof evt.payload === 'object' && evt.payload && 'summary' in evt.payload ? String(evt.payload.summary) : evt.type,
+            data: evt.payload as Record<string, unknown>,
+          });
+        }
+      } catch {
+        // Ledger error must never crash agent execution
+      }
+    });
 
     const permissionService = new DefaultPermissionService({ eventBus });
     const changesetRepo = new ChangesetRepository(db);
@@ -316,7 +388,7 @@ export const runCommand = new Command('run')
         title: pt.title,
         description: pt.description,
         assignedAgentRole: pt.assignedAgentRole as AgentRole,
-        dependsOn: pt.dependsOn.map((depId) => depId.startsWith(`${taskId}_`) ? depId : `${taskId}_${depId}`),
+        dependsOn: pt.dependsOn.map((depId: string) => depId.startsWith(`${taskId}_`) ? depId : `${taskId}_${depId}`),
         status: 'pending',
         acceptanceCriteria: pt.acceptanceCriteria,
         createdAt: now,
@@ -397,6 +469,16 @@ export const runCommand = new Command('run')
             (a) => a.path.endsWith('test-report.md') || a.title.toLowerCase().includes('test')
           );
 
+          try {
+            await missionLedger.updateStatus('completed', {
+              summary: `Completed goal: ${goal}`,
+              files_changed: diffArt ? [diffArt.path] : [],
+              approval_status: 'approved',
+            });
+          } catch {
+            // ignore
+          }
+
           logger.info(green(`\n✔ Task "${taskTitle}" completed successfully!`));
           logger.info(bold('\nArtifacts Generated:'));
           if (changeSummary) logger.info(`  • Change Summary: ${cyan(changeSummary.path)}`);
@@ -405,6 +487,10 @@ export const runCommand = new Command('run')
           if (result.finalArtifact && !changeSummary && !diffArt && !testReport) {
             logger.info(bold(cyan(`  • Final Deliverable: ${result.finalArtifact.path}`)));
           }
+          logger.info(bold('\nMission Audit Trail (Tamper-evident):'));
+          logger.info(`  • Mission:     ${cyan(missionRecord.mission_id)} (${missionRecord.display_id})`);
+          logger.info(`  • Audit show:  agentfeed mission show ${missionRecord.mission_id}`);
+          logger.info(`  • Export:      agentfeed mission export ${missionRecord.mission_id} --format md`);
           logger.info(bold('\nExecution Summary:'));
           logger.info(dim(`  Task ID:  ${taskId}`));
           logger.info(dim(`  Duration: ${(result.durationMs / 1000).toFixed(1)}s | Tokens: ${result.totalUsage.inputTokens + result.totalUsage.outputTokens} | Cost: $${(result.totalUsage.estimatedCostUsd ?? 0).toFixed(4)}`));
@@ -412,14 +498,36 @@ export const runCommand = new Command('run')
           logger.info(`  agentfeed task ${taskId}`);
           logger.info(`  agentfeed events ${taskId}\n`);
         } else if (result.taskStatus === 'blocked') {
+          try {
+            await missionLedger.updateStatus('failed', {
+              summary: `Task blocked (${result.nodesBlocked} nodes blocked)`,
+            });
+          } catch {
+            // ignore
+          }
           logger.warn(yellow(`\n⚠ Task "${taskTitle}" is BLOCKED (${result.nodesBlocked} nodes blocked).\n`));
           process.exitCode = 1;
         } else {
+          try {
+            await missionLedger.updateStatus('failed', {
+              summary: `Task failed (${result.nodesFailed} nodes failed)`,
+            });
+          } catch {
+            // ignore
+          }
           logger.error(red(`\n✖ Task "${taskTitle}" FAILED (${result.nodesFailed} nodes failed).\n`));
           process.exitCode = 1;
         }
       } else {
-        void runPromise.then(() => {
+        void runPromise.then(async () => {
+          try {
+            await missionLedger.updateStatus('completed', {
+              summary: `Task ${taskId} completed`,
+              approval_status: 'approved',
+            });
+          } catch {
+            // ignore
+          }
           if (options.fast && !process.stdin.isTTY) {
             setTimeout(() => inkInstance?.unmount(), 600);
           }
@@ -429,6 +537,15 @@ export const runCommand = new Command('run')
 
     const executeRejection = async (reason = 'Operator rejected proposed plan') => {
       await taskRepo.updateStatus(taskId, 'failed');
+
+      try {
+        await missionLedger.updateStatus('failed', {
+          summary: `Plan rejected: ${reason}`,
+          approval_status: 'rejected',
+        });
+      } catch {
+        // ignore
+      }
 
       await eventBus.publish({
         eventId: generateId('evt'),
@@ -549,6 +666,8 @@ export const runCommand = new Command('run')
         React.createElement(App, {
           eventBus,
           runner: controller,
+          provider: llmConfig.provider,
+          model: llmConfig.model,
           onExit: () => {
             abortController.abort();
           },

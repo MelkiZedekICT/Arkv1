@@ -19,10 +19,9 @@ export const initCommand = new Command('init')
         logger.info(`Storage directory ready: ${storageDir}`);
       }
 
-      // 1. Create or load config
+      // 1. Create or initialize non-secret config (no plaintext API keys)
       saveConfig({
         modelProvider: 'openai',
-        apiKey: '',
         model: 'gpt-4o',
       });
       logger.info(`Configuration initialized: ${join(storageDir, 'config.json')}`);
@@ -42,11 +41,11 @@ export const initCommand = new Command('init')
 
       logger.info('\nInitialization complete.');
       logger.info('To get started:');
-      logger.info('  1. Set your API key in: ' + join(storageDir, 'config.json'));
-      logger.info('  2. Create a task: agentfeed task:create "Your goal here"');
-      logger.info('  3. View tasks:    agentfeed tasks\n');
+      logger.info('  1. Set up your AI provider: agentfeed setup');
+      logger.info('  2. Or try the offline demo:  agentfeed demo');
+      logger.info('  3. Start a task:             agentfeed run "Your goal here"\n');
     } catch (err) {
-      logger.error('Initialization failed', err);
+      logger.error('Initialization failed: ' + String(err));
       process.exitCode = 1;
     }
   });

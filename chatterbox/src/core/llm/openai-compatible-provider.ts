@@ -41,11 +41,11 @@ export function asStreamingLlmProvider(provider: LlmProvider): StreamingLlmProvi
 
 export class OpenAiCompatibleProvider implements StreamingLlmProvider {
   readonly name = 'openai-compatible';
-  private readonly baseUrl: string;
-  private readonly defaultModel: string;
-  private readonly apiKeyEnvVar: string;
-  private readonly timeoutMs: number;
-  private readonly maxRetries: number;
+  readonly baseUrl: string;
+  readonly defaultModel: string;
+  readonly apiKeyEnvVar: string;
+  readonly timeoutMs: number;
+  readonly maxRetries: number;
 
   constructor(options: OpenAiCompatibleOptions = {}) {
     const rawUrl = options.baseUrl || 'https://api.openai.com/v1';

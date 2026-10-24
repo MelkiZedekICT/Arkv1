@@ -161,7 +161,11 @@ export const ApprovalPrompt: React.FC<ApprovalPromptProps> = ({ approval }) => {
         <Text color={noColor ? undefined : chatterboxAnsi.error} bold>
           R
         </Text>
-        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}> reject</Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}> reject · </Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.warning} bold>
+          E
+        </Text>
+        <Text color={noColor ? undefined : chatterboxAnsi.textSecondary}> edit instruction</Text>
         {approval.diffSnippet && (
           <>
             <Text color={noColor ? undefined : chatterboxAnsi.textMuted}> · </Text>

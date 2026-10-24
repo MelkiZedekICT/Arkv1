@@ -1,7 +1,20 @@
 import { z } from 'zod';
 
+export const ProviderNameSchema = z.enum([
+  'openai',
+  'anthropic',
+  'google-gemini',
+  'openrouter',
+  'groq',
+  'ollama',
+  'custom',
+  'mock',
+]);
+
+export type ProviderNameEnum = z.infer<typeof ProviderNameSchema>;
+
 export const LlmConfigSchema = z.object({
-  provider: z.enum(['mock', 'openai-compatible']).default('mock'),
+  provider: z.enum(['mock', 'openai-compatible', 'openai', 'anthropic', 'google-gemini', 'openrouter', 'groq', 'ollama', 'custom']).default('mock'),
   model: z.string().default('gpt-4o'),
   baseUrl: z.string().default('https://api.openai.com/v1'),
   apiKeyEnvVar: z.string().default('OPENAI_API_KEY'),
@@ -14,8 +27,7 @@ export const LlmConfigSchema = z.object({
 export type LlmConfig = z.infer<typeof LlmConfigSchema>;
 
 export const ConfigSchema = z.object({
-  modelProvider: z.enum(['openai', 'anthropic', 'openrouter', 'mock', 'openai-compatible']).default('mock'),
-  apiKey: z.string().default(''),
+  modelProvider: ProviderNameSchema.default('mock'),
   model: z.string().default('gpt-4o'),
   storageDir: z.string().default('.chatterbox'),
   verbose: z.boolean().default(false),
